@@ -1,0 +1,75 @@
+name: Build
+
+on:
+  push:
+    branches: [ master, dev ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  unittests:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          #- { os: 'ubuntu-latest',  compiler: 'clang', version: 10 }
+          - { os: 'ubuntu-latest',  compiler: 'clang', version: 11 }
+          - { os: 'ubuntu-latest',  compiler: 'clang', version: 12 }
+          - { os: 'ubuntu-latest',  compiler: 'clang', version: 13 }
+
+          #- { os: 'ubuntu-latest',  compiler: 'gcc',   version: 9 }
+          - { os: 'ubuntu-latest',  compiler: 'gcc',   version: 10 }
+          - { os: 'ubuntu-latest',  compiler: 'gcc',   version: 11 }
+
+          #- { os: 'windows-latest', compiler: 'mingw', version: '9.4.0', config: "-G 'MinGW Makefiles'" }
+          - { os: 'windows-latest', compiler: 'mingw', version: '10.3.0', config: "-G 'MinGW Makefiles'" }
+          - { os: 'windows-latest', compiler: 'mingw', version: '11.2.0', config: "-G 'MinGW Makefiles'" }
+
+          - { os: 'windows-2019',   compiler: 'msvc',  version: '19.29' } # Visual Studio 2019
+          - { os: 'windows-2022',   compiler: 'msvc',  version: '19.30' } # Visual Studio 2022
+
+    name:  "Unit tests: ${{matrix.compiler}}-${{matrix.version}}"
+
+    runs-on: ${{matrix.os}}
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install GCC
+      if: matrix.compiler == 'gcc'
+      uses: ./.github/workflows/setup-gcc
+      with:
+        version: ${{matrix.version}}
+        platform: x64
+
+    - name: Install clang
+      if: matrix.compiler == 'clang'
+      uses: ./.github/workflows/setup-clang
+      with:
+        version: ${{matrix.version}}
+        platform: x64
+
+    - name: Install mingw
+      if: matrix.compiler == 'mingw'
+      uses: ./.github/workflows/setup-mingw
+      with:
+        version: ${{matrix.version}}
+        platform: x64
+
+    - name: Configure
+      run: |
+        cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON ${{matrix.config}}
+      env:
+        CC: cc
+        CXX: c++
+
+    - name: Build
+      working-directory: ${{github.workspace}}/build
+      run: cmake --build . --config ${{env.BUILD_TYPE}}
+
+    - name: Run
+      working-directory: ${{github.workspace}}/build
+      run: ctest --build-config ${{env.BUILD_TYPE}}

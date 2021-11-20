@@ -1,0 +1,292 @@
+# This was taken from https://github.com/egor-tensin/setup-clang.
+
+name: Install Clang
+description: Install Clang & LLVM
+
+inputs:
+  version:
+    description: Version to install
+    required: false
+    default: latest
+  platform:
+    description: Target platform
+    required: false
+    default: x64
+  cygwin:
+    description: Install Cygwin packages
+    required: false
+    default: 0
+  cc:
+    description: Set up cc/clang/c++/clang++ executables
+    required: false
+    default: 1
+  hardlinks:
+    description: On Cygwin, replace executable symlinks with hardlinks
+    required: false
+    default: 0
+
+outputs:
+  clang:
+    description: clang binary name
+    value: '${{ steps.install.outputs.clang }}'
+  clangxx:
+    description: clang++ binary name
+    value: '${{ steps.install.outputs.clangxx }}'
+
+runs:
+  using: composite
+  steps:
+    - id: install
+      run: |
+        New-Variable os -Value '${{ runner.os }}' -Option Constant
+
+        New-Variable linux_host -Value ($os -eq 'Linux') -Option Constant
+        New-Variable cygwin_host -Value ('${{ inputs.cygwin }}' -eq '1') -Option Constant
+        New-Variable windows_host -Value ($os -eq 'Windows' -and !$cygwin_host) -Option Constant
+
+        New-Variable version -Value ('${{ inputs.version }}') -Option Constant
+        New-Variable latest -Value ($version -eq 'latest') -Option Constant
+        New-Variable x64 -Value ('${{ inputs.platform }}' -eq 'x64') -Option Constant
+
+        function Locate-Choco {
+            $path = Get-Command 'choco' -ErrorAction SilentlyContinue
+            if ($path) {
+                $path.Path
+            } else {
+                Join-Path ${env:ProgramData} 'chocolatey' 'bin' 'choco'
+            }
+        }
+
+        function Install-Package {
+            param(
+                [Parameter(Mandatory=$true, ValueFromRemainingArguments=$true)]
+                [string[]] $Packages
+            )
+
+            if ($script:linux_host) {
+                sudo apt-get update
+                sudo DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends $Packages
+            } elseif ($script:cygwin_host) {
+                $choco = Locate-Choco
+                & $choco install $Packages -y --no-progress --source=cygwin
+            } elseif ($script:windows_host) {
+                $choco = Locate-Choco
+                & $choco upgrade $Packages -y --no-progress --allow-downgrade
+            } else {
+                throw "Sorry, installing packages is unsupported on $script:os"
+            }
+        }
+
+        function Get-DistroVersion {
+            if (!(Get-Command lsb_release -ErrorAction SilentlyContinue)) {
+                throw "Couldn't find lsb_release; LLVM only provides repositories for Debian/Ubuntu"
+            }
+            $distro = lsb_release -is
+            $version = lsb_release -sr
+            "$distro-$version"
+        }
+
+        function Format-UpstreamVersion {
+            param(
+                [Parameter(Mandatory=$true)]
+                [string] $Version
+            )
+
+            switch -Exact ($Version) {
+                # Since version 7, they dropped the .0 suffix. The earliest
+                # version supported is 3.9 on Bionic; versions 4, 5 and 6 are
+                # mapped to LLVM-friendly 4.0, 5.0 and 6.0.
+                '4' { '4.0' }
+                '5' { '5.0' }
+                '6' { '6.0' }
+                default { $Version }
+            }
+        }
+
+        function Format-AptLine {
+            # Source: https://apt.llvm.org/llvm.sh
+            # Don't forget to update once in a while.
+
+            param(
+                [Parameter(Mandatory=$true)]
+                [string] $Version
+            )
+
+            $distro = Get-DistroVersion
+
+            switch -Wildcard -CaseSensitive ($distro) {
+                'Debian-9*'       { "deb http://apt.llvm.org/stretch/  llvm-toolchain-stretch-$Version  main" }
+                'Debian-10*'      { "deb http://apt.llvm.org/buster/   llvm-toolchain-buster-$Version   main" }
+                'Debian-11*'      { "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-$Version main" }
+                'Debian-unstable' { "deb http://apt.llvm.org/unstable/ llvm-toolchain-$Version main" }
+                'Debian-testing'  { "deb http://apt.llvm.org/unstable/ llvm-toolchain-$Version main" }
+                'Ubuntu-16.04'    { "deb http://apt.llvm.org/xenial/   llvm-toolchain-xenial-$Version   main" }
+                'Ubuntu-18.04'    { "deb http://apt.llvm.org/bionic/   llvm-toolchain-bionic-$Version   main" }
+                'Ubuntu-18.10'    { "deb http://apt.llvm.org/cosmic/   llvm-toolchain-cosmic-$Version   main" }
+                'Ubuntu-19.04'    { "deb http://apt.llvm.org/disco/    llvm-toolchain-disco-$Version    main" }
+                'Ubuntu-19.10'    { "deb http://apt.llvm.org/eoan/     llvm-toolchain-eoan-$Version     main" }
+                'Ubuntu-20.04'    { "deb http://apt.llvm.org/focal/    llvm-toolchain-focal-$Version    main" }
+                # WTF is this? As of 2021-10-15, Ubuntu 20.10 is missing from the upstream llvm.sh,
+                # 21.04 (Hirsute) points to the the previous release (Groovy), and 21.10 (Impish)
+                # also points to the previous release (Hirsute). A mistake on their part?
+                'Ubuntu-20.10'    { "deb http://apt.llvm.org/groovy/   llvm-toolchain-groovy-$Version   main" }
+                'Ubuntu-21.04'    { "deb http://apt.llvm.org/groovy/   llvm-toolchain-groovy-$Version   main" }
+                'Ubuntu-21.10'    { "deb http://apt.llvm.org/hirsute/  llvm-toolchain-hirsute-$Version  main" }
+
+                default { throw "Unsupported distribution: $distro" }
+            }
+        }
+
+        function Add-UpstreamRepo {
+            param(
+                [Parameter(Mandatory=$true)]
+                [string] $Version
+            )
+
+            wget -qO - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+            $apt_line = Format-AptLine $Version
+            sudo add-apt-repository --yes --update $apt_line
+        }
+
+        $clang = 'clang'
+        $clangxx = 'clang++'
+
+        if ($linux_host) {
+            $pkg_clang = 'clang'
+            $pkg_llvm = 'llvm'
+            $pkg_gxx = 'g++'
+            $additional_deps = @()
+
+            if (!$latest) {
+                $pkg_version = Format-UpstreamVersion $version
+                Add-UpstreamRepo $pkg_version
+
+                $pkg_clang = "$pkg_clang-$pkg_version"
+                $pkg_llvm = "$pkg_llvm-$pkg_version"
+
+                $clang = "$clang-$pkg_version"
+                $clangxx = "$clangxx-$pkg_version"
+
+                if ($pkg_version -eq '13') {
+                    # On both Bionic and Focal, the following error occurs otherwise:
+                    #
+                    # The following packages have unmet dependencies:
+                    #  llvm-13 : Depends: libomp5-13 (>= 8) but it is not going to be installed
+                    # E: Unable to correct problems, you have held broken packages.
+                    $additional_deps += 'libomp5-13'
+                }
+            }
+            if (!$x64) {
+                $pkg_gxx = 'g++-multilib'
+            }
+            $packages = $pkg_clang,$pkg_llvm,$pkg_gxx
+            $packages += $additional_deps
+
+            Install-Package $packages
+        } elseif ($cygwin_host) {
+            if (!$x64) {
+                echo @'
+        ::warning ::
+        32-bit-targeting Clang is unavailable on 64-bit Cygwin.
+        Please use 32-bit Cygwin instead.
+        If you _are_ using 32-bit Cygwin, please ignore this message.
+        '@
+            }
+
+            # IDK why, but without libiconv-devel, even a "Hello, world!"
+            # C++ app cannot be compiled as of December 2020. Also, libstdc++
+            # is required; it's simpler to install gcc-g++ for all the
+            # dependencies.
+            Install-Package clang gcc-g++ libiconv-devel llvm
+        } elseif ($windows_host) {
+            Install-Package llvm
+
+            $bin_dir = Join-Path $env:ProgramFiles LLVM bin
+            echo $bin_dir >> $env:GITHUB_PATH
+        } else {
+            throw "Sorry, installing Clang is unsupported on $os"
+        }
+
+        echo "::set-output name=clang::$clang"
+        echo "::set-output name=clangxx::$clangxx"
+      shell: pwsh
+
+    - run: |
+        New-Variable os -Value '${{ runner.os }}' -Option Constant
+
+        New-Variable linux_host -Value ($os -eq 'Linux') -Option Constant
+        New-Variable cygwin_host -Value ('${{ inputs.cygwin }}' -eq '1') -Option Constant
+        New-Variable windows_host -Value ($os -eq 'Windows' -and !$cygwin_host) -Option Constant
+
+        New-Variable cc -Value ('${{ inputs.cc }}' -eq '1') -Option Constant
+
+        New-Variable clang -Value '${{ steps.install.outputs.clang }}' -Option Constant
+        New-Variable clangxx -Value '${{ steps.install.outputs.clangxx }}' -Option Constant
+
+        function Link-Exe {
+            param(
+                [Parameter(Mandatory=$true)]
+                [string] $Exe,
+                [Parameter(Mandatory=$true)]
+                [string] $LinkName
+            )
+
+            $exe_path = (Get-Command $Exe).Path
+            $link_dir = if ($script:windows_host) { Split-Path $exe_path } else { '/usr/local/bin' }
+            $link_name = if ($script:windows_host) { "$LinkName.exe" } else { $LinkName }
+            $link_path = if ($script:cygwin_host) { "$link_dir/$link_name" } else { Join-Path $link_dir $link_name }
+            echo "Creating link $link_path -> $exe_path"
+            if ($script:linux_host) {
+                sudo ln -f -s $exe_path $link_path
+            } elseif ($script:cygwin_host) {
+                ln.exe -f -s $exe_path $link_path
+            } elseif ($script:windows_host) {
+                New-Item -ItemType HardLink -Path $link_path -Value $exe_path -Force | Out-Null
+            }
+        }
+
+        if ($cc) {
+            Link-Exe $clang cc
+            if ($clang -ne 'clang') {
+                Link-Exe $clang 'clang'
+            }
+            Link-Exe $clangxx c++
+            if ($clangxx -ne 'clang++') {
+                Link-Exe $clangxx 'clang++'
+            }
+        }
+      shell: pwsh
+
+    - run: |
+        New-Variable cygwin_host -Value ('${{ inputs.cygwin }}' -eq '1') -Option Constant
+        New-Variable hardlinks -Value ('${{ inputs.hardlinks }}' -eq '1') -Option Constant
+
+        if ($cygwin_host -and $hardlinks) {
+            # clang/clang++ are Cygwin symlinks, pointing to clang-X.exe. It's
+            # convenient to make proper executables instead so that they can be
+            # called from Windows' command prompt.
+            echo @'
+        while IFS= read -d '' -r link_path; do
+            dest_path="$( readlink --canonicalize-existing -- "$link_path" )"
+            dest_ext=".${dest_path##*.}"
+            [ "$dest_ext" == ".$dest_path" ] && dest_ext=
+            link_ext=".${link_path##*.}"
+            [ "$link_ext" == ".$link_path" ] && link_ext=
+            echo "Removing symlink $link_path" && rm -f -- "$link_path"
+            [ "$link_ext" != "$dest_ext" ] && echo "${PATHEXT//\;/
+        }" | grep -q --ignore-case --line-regexp -F -- "$dest_ext" && link_path="$link_path$dest_ext"
+            echo "Creating hardlink $link_path -> $dest_path" && ln -- "$dest_path" "$link_path"
+        done < <( find /usr/local/bin /usr/bin \
+                       -type l '-(' \
+                       -path '/usr/bin/clang*' -o \
+                       -path '/usr/bin/llvm*' -o \
+                       -path /usr/local/bin/cc -o \
+                       -path /usr/local/bin/c++ \
+                       '-)' -print0 )
+        '@ | & bash.exe --login -o errexit -o nounset -o pipefail -o igncr
+        }
+      shell: pwsh
+
+branding:
+  icon: star
+  color: green

@@ -1,0 +1,12 @@
+BasedOnStyle: LLVM
+
+SortIncludes: false
+
+# Indentation
+IndentWidth: 4
+AccessModifierOffset: -4
+NamespaceIndentation: All
+
+# Force pointers to the type for C++.
+DerivePointerAlignment: false
+PointerAlignment: Left
