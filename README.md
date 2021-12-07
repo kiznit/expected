@@ -34,7 +34,6 @@ Yes it is. Although it is labelled as "preview", it is fully functional and used
 - Revise all constraints, use C++20 constraints?
 - Add noexcept to all relevant methods
 - Do we need a const version of expected_storage?
-- Should we be always using () to build objects, at least in the library code?
 - Are we handling T=const/volatile void properly?
 - Add static_assert<>s at top of expected/unexpected to enforce certain constraints?
 - Refactor/rewrite unit tests and get to 100% coverage

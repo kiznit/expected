@@ -297,7 +297,7 @@ namespace mtl {
                       std::enable_if_t<
                           !std::is_nothrow_move_constructible_v<U>>* = nullptr>
             void move_value_to_error(expected_storage&& other) {
-                unexpected<E> temp{std::move(_error)};
+                unexpected<E> temp(std::move(_error));
                 _error.~unexpected<E>();
                 try {
                     new (std::addressof(_value)) T(std::move(other._value));
@@ -330,7 +330,7 @@ namespace mtl {
                       std::enable_if_t<
                           !std::is_nothrow_move_constructible_v<G>>* = nullptr>
             void move_error_to_value(expected_storage&& other) {
-                T temp{std::move(_value)};
+                T temp(std::move(_value));
                 _value.~T();
                 try {
                     new (std::addressof(_error))
@@ -353,28 +353,22 @@ namespace mtl {
 #if MTL_EXCEPTIONS
             template <typename... Args> T& emplace(Args&&... args) {
                 if (_has_value) {
-                    _value = T{std::forward<Args>(args)...};
+                    _value = T(std::forward<Args>(args)...);
                 } else if (std::is_nothrow_constructible_v<T, Args...>) {
                     _error.~unexpected<E>();
-                    new (std::addressof(_value)) T{std::forward<Args>(args)...};
+                    new (std::addressof(_value)) T(std::forward<Args>(args)...);
                     _has_value = true;
                 } else if (std::is_nothrow_move_constructible_v<T>) {
-                    // TODO: using {} instead of () when constructing temp
-                    // results in unit test failures. I suspect this happens
-                    // when T = std::vector<>. but I haven't verified. It
-                    // appears {} and () are not the same thing and we need to
-                    // figure this out and review all the code to ensure we got
-                    // this right.
                     T temp(std::forward<Args>(args)...);
                     _error.~unexpected<E>();
-                    new (std::addressof(_value)) T{std::move(temp)};
+                    new (std::addressof(_value)) T(std::move(temp));
                     _has_value = true;
                 } else {
                     unexpected<E> temp(std::move(_error));
                     _error.~unexpected<E>();
                     try {
                         new (std::addressof(_value))
-                            T{std::forward<Args>(args)...};
+                            T(std::forward<Args>(args)...);
                         _has_value = true;
                     } catch (...) {
                         new (std::addressof(_error))
@@ -388,24 +382,24 @@ namespace mtl {
             template <typename U, typename... Args>
             T& emplace(std::initializer_list<U> list, Args&&... args) {
                 if (_has_value) {
-                    _value = T{list, std::forward<Args>(args)...};
+                    _value = T(list, std::forward<Args>(args)...);
                 } else if (std::is_nothrow_constructible_v<
                                T, std::initializer_list<U>&, Args...>) {
                     _error.~unexpected<E>();
                     new (std::addressof(_value))
-                        T{list, std::forward<Args>(args)...};
+                        T(list, std::forward<Args>(args)...);
                     _has_value = true;
                 } else if (std::is_nothrow_move_constructible_v<T>) {
                     T temp(list, std::forward<Args>(args)...);
                     _error.~unexpected<E>();
-                    new (std::addressof(_value)) T{std::move(temp)};
+                    new (std::addressof(_value)) T(std::move(temp));
                     _has_value = true;
                 } else {
                     unexpected<E> temp(std::move(_error));
                     _error.~unexpected<E>();
                     try {
                         new (std::addressof(_value))
-                            T{list, std::forward<Args>(args)...};
+                            T(list, std::forward<Args>(args)...);
                         _has_value = true;
                     } catch (...) {
                         new (std::addressof(_error))
@@ -418,19 +412,19 @@ namespace mtl {
 #else
             template <typename... Args> T& emplace(Args&&... args) {
                 if (_has_value) {
-                    _value = T{std::forward<Args>(args)...};
+                    _value = T(std::forward<Args>(args)...);
                 } else if (std::is_nothrow_constructible_v<T, Args...>) {
                     _error.~unexpected<E>();
-                    new (std::addressof(_value)) T{std::forward<Args>(args)...};
+                    new (std::addressof(_value)) T(std::forward<Args>(args)...);
                     _has_value = true;
                 } else if (std::is_nothrow_move_constructible_v<T>) {
                     T temp(std::forward<Args>(args)...);
                     _error.~unexpected<E>();
-                    new (std::addressof(_value)) T{std::move(temp)};
+                    new (std::addressof(_value)) T(std::move(temp));
                     _has_value = true;
                 } else {
                     _error.~unexpected<E>();
-                    new (std::addressof(_value)) T{std::forward<Args>(args)...};
+                    new (std::addressof(_value)) T(std::forward<Args>(args)...);
                     _has_value = true;
                 }
                 return _value;
@@ -439,22 +433,22 @@ namespace mtl {
             template <typename U, typename... Args>
             T& emplace(std::initializer_list<U> list, Args&&... args) {
                 if (_has_value) {
-                    _value = T{list, std::forward<Args>(args)...};
+                    _value = T(list, std::forward<Args>(args)...);
                 } else if (std::is_nothrow_constructible_v<
                                T, std::initializer_list<U>&, Args...>) {
                     _error.~unexpected<E>();
                     new (std::addressof(_value))
-                        T{list, std::forward<Args>(args)...};
+                        T(list, std::forward<Args>(args)...);
                     _has_value = true;
                 } else if (std::is_nothrow_move_constructible_v<T>) {
                     T temp(list, std::forward<Args>(args)...);
                     _error.~unexpected<E>();
-                    new (std::addressof(_value)) T{std::move(temp)};
+                    new (std::addressof(_value)) T(std::move(temp));
                     _has_value = true;
                 } else {
                     _error.~unexpected<E>();
                     new (std::addressof(_value))
-                        T{list, std::forward<Args>(args)...};
+                        T(list, std::forward<Args>(args)...);
                     _has_value = true;
                 }
                 return _value;
