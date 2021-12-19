@@ -27,129 +27,45 @@
 
 #pragma once
 
-#include <initializer_list>
-#include <vector>
-
-template <typename T> struct Value {
-    using value_type = T;
-
-    Value(T x) noexcept : value(x) {}
-    Value(std::initializer_list<T> list) noexcept : value(*list.begin()) {}
-    template <typename U> Value(const Value<U>& x) noexcept : value(x.value) {}
-
-    ~Value() { value = 0; }
-
-    T value;
-
-protected:
-    Value() {}
-};
-
-template <typename T>
-inline bool operator==(const Value<T>& x, const Value<T>& y) {
-    return x.value == y;
-}
-
-template <typename T> inline bool operator==(const Value<T>& x, T y) {
-    return x.value == y;
-}
-
-template <typename T> struct MoveableValue {
-    using value_type = T;
-
-    MoveableValue(T x) : value(x) {}
-    MoveableValue(MoveableValue<T>&& x)
-        : value(x.value), throwsOnMove(x.throwsOnMove) {
-#if MTL_EXCEPTIONS
-        if (throwsOnMove)
-            throw std::exception();
-#endif
-        x.value = T(0);
-    }
-    template <typename U> MoveableValue(MoveableValue<U>&& x) : value(x.value) {
-        x.value = T(0);
-    }
-    constexpr MoveableValue& operator=(MoveableValue&& x) {
-        value = x.value;
-        x.value = 0;
-        return *this;
-    }
-
-    // Can't be copied
-    MoveableValue(const MoveableValue&) = delete;
-    MoveableValue& operator=(const MoveableValue&) = delete;
-
-    ~MoveableValue() { value = 0; }
-
-    T value;
-    bool throwsOnMove{false};
-};
-
-template <typename T> inline bool operator==(const MoveableValue<T>& x, T y) {
-    return x.value == y;
-}
-
-template <typename T> struct Default : Value<T> {
-    constexpr static T DefaultValue = -100;
-
-    Default() { this->value = DefaultValue; }
-};
-
-template <typename T> inline bool operator==(const Default<T>& x, T y) {
-    return x.value == y;
-}
-
-using IntValue = Value<int>;
-using LongValue = Value<long>;
-using IntMoveableValue = MoveableValue<int>;
-using LongMoveableValue = MoveableValue<long>;
-using DefaultInt = Default<int>;
-
-struct ComplexThing {
-    ComplexThing(const IntValue& a, IntMoveableValue&& b)
-        : a(a), b(std::move(b)) {}
-
-    ComplexThing(std::vector<int> list, const IntValue& a, IntMoveableValue&& b)
-        : list(list), a(a), b(std::move(b)) {}
-
-    std::vector<int> list;
-    IntValue a;
-    IntMoveableValue b;
-};
-
-struct AssignableComplexThing : ComplexThing {
-
-    template <typename... Args>
-    AssignableComplexThing(Args&&... args)
-        : ComplexThing(std::forward<Args>(args)...) {}
-
-    AssignableComplexThing(const AssignableComplexThing& other)
-        : ComplexThing(other.list, other.a, IntMoveableValue(other.b.value)),
-          throwsOnCopy(other.throwsOnCopy) {
-#if MTL_EXCEPTIONS
-        if (throwsOnCopy)
-            throw std::exception();
-#endif
-    }
-
-    AssignableComplexThing& operator=(const AssignableComplexThing& other) {
-        list = other.list;
-        a = other.a;
-        b = other.b.value;
-        return *this;
-    }
-
-    bool throwsOnCopy{false};
-};
-
-struct NotNoThrowConstructible {
-
-    explicit NotNoThrowConstructible(int x) : value(x) {}
-    explicit NotNoThrowConstructible(const NotNoThrowConstructible& other)
-        : value(other.value) {}
-
-    NotNoThrowConstructible&
-    operator=(const NotNoThrowConstructible&) = default;
-
+struct DefaultConstructible {
+    constexpr static int DefaultValue = -100;
+    DefaultConstructible() : value(DefaultValue) {}
     int value;
 };
+static_assert(std::is_default_constructible_v<DefaultConstructible>);
+
+struct NotDefaultConstructible {
+    NotDefaultConstructible(int x) : value(x) {}
+    int value;
+};
+static_assert(!std::is_default_constructible_v<NotDefaultConstructible>);
+
+struct CopyConstructible {
+    CopyConstructible(int x) : value(x) {}
+    int value;
+};
+static_assert(std::is_copy_constructible_v<CopyConstructible>);
+
+struct NotCopyConstructible {
+    NotCopyConstructible(int x) : value(x) {}
+    NotCopyConstructible(const NotCopyConstructible&) = delete;
+    int value;
+};
+static_assert(!std::is_copy_constructible_v<NotCopyConstructible>);
+
+struct MoveConstructible {
+    MoveConstructible(int x) : value(x) {}
+    MoveConstructible(MoveConstructible&& rhs) {
+        value = rhs.value;
+        rhs.value = -1;
+    }
+    int value;
+};
+static_assert(std::is_move_constructible_v<MoveConstructible>);
+
+struct NotMoveConstructible {
+    NotMoveConstructible(int x) : value(x) {}
+    NotMoveConstructible(NotMoveConstructible&& rhs) = delete;
+    int value;
+};
+static_assert(!std::is_move_constructible_v<NotMoveConstructible>);

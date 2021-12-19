@@ -27,24 +27,26 @@
 
 #include <expected>
 #include <catch2/catch.hpp>
-#include "value.hpp"
+#include "old.value.hpp"
 
 TEST_CASE("unexpected constructors", "[unexpected]") {
 
+    static_assert(!std::is_default_constructible_v<kz::unexpected<int>>);
+
     SECTION("from value") {
-        mtl::unexpected<IntValue> a{123};
+        kz::unexpected<IntValue> a{123};
         REQUIRE(a.value() == 123);
     }
 
     SECTION("in-place with value") {
-        mtl::unexpected<IntValue> a{std::in_place, 123};
+        kz::unexpected<IntValue> a{std::in_place, 123};
         REQUIRE(a.value() == 123);
     }
 
     SECTION("in-place with multiple parameters") {
         const IntValue a{100};
         IntMoveableValue b{200};
-        mtl::unexpected<ComplexThing> c{std::in_place, a, std::move(b)};
+        kz::unexpected<ComplexThing> c{std::in_place, a, std::move(b)};
 
         REQUIRE(c.value().a == 100);
         REQUIRE(c.value().b == 200);
@@ -53,14 +55,14 @@ TEST_CASE("unexpected constructors", "[unexpected]") {
     }
 
     SECTION("in-place with initializer list") {
-        mtl::unexpected<std::vector<int>> a{std::in_place, {1, 2, 3}};
+        kz::unexpected<std::vector<int>> a{std::in_place, {1, 2, 3}};
         REQUIRE(a.value().size() == 3);
     }
 
     SECTION("in-place with initializer list and extra parameters") {
         const IntValue a{100};
         IntMoveableValue b{200};
-        mtl::unexpected<ComplexThing> c{
+        kz::unexpected<ComplexThing> c{
             std::in_place, {1, 2, 3}, a, std::move(b)};
         REQUIRE(c.value().a == 100);
         REQUIRE(c.value().b == 200);
@@ -71,35 +73,35 @@ TEST_CASE("unexpected constructors", "[unexpected]") {
 
     SECTION("copy") {
 
-        const mtl::unexpected<IntValue> a{123};
-        mtl::unexpected<IntValue> b{a};
+        const kz::unexpected<IntValue> a{123};
+        kz::unexpected<IntValue> b{a};
         REQUIRE(a.value() == 123);
         REQUIRE(b.value() == 123);
     }
 
     SECTION("move") {
-        mtl::unexpected<IntMoveableValue> a{42};
-        mtl::unexpected<IntMoveableValue> b{std::move(a)};
+        kz::unexpected<IntMoveableValue> a{42};
+        kz::unexpected<IntMoveableValue> b{std::move(a)};
         REQUIRE(a.value() == 0);
         REQUIRE(b.value() == 42);
     }
 
     SECTION("copy with conversion") {
-        const mtl::unexpected<IntValue> a{123};
-        mtl::unexpected<LongValue> b{a};
+        const kz::unexpected<IntValue> a{123};
+        kz::unexpected<LongValue> b{a};
         REQUIRE(a.value() == 123);
         REQUIRE(b.value() == 123l);
     }
 
     SECTION("move with conversion") {
-        mtl::unexpected<IntMoveableValue> a{69};
-        mtl::unexpected<LongMoveableValue> b{std::move(a)};
+        kz::unexpected<IntMoveableValue> a{69};
+        kz::unexpected<LongMoveableValue> b{std::move(a)};
         REQUIRE(a.value() == 0);
         REQUIRE(b.value() == 69l);
     }
 
     SECTION("template argument deduction guide") {
-        mtl::unexpected a{IntValue{33}};
+        kz::unexpected a{IntValue{33}};
         REQUIRE(a.value() == 33);
     }
 }
@@ -107,32 +109,32 @@ TEST_CASE("unexpected constructors", "[unexpected]") {
 TEST_CASE("unexpected assignments", "[unexpected]") {
 
     SECTION("by value") {
-        mtl::unexpected<IntValue> a{10};
-        mtl::unexpected<IntValue> b{20};
+        kz::unexpected<IntValue> a{10};
+        kz::unexpected<IntValue> b{20};
         a = b;
         REQUIRE(a.value() == 20);
         REQUIRE(b.value() == 20);
     }
 
     SECTION("by move") {
-        mtl::unexpected<IntMoveableValue> a{10};
-        mtl::unexpected<IntMoveableValue> b{20};
+        kz::unexpected<IntMoveableValue> a{10};
+        kz::unexpected<IntMoveableValue> b{20};
         a = std::move(b);
         REQUIRE(a.value() == 20);
         REQUIRE(b.value() == 0);
     }
 
     SECTION("by value with conversion") {
-        mtl::unexpected<IntValue> a{11};
-        mtl::unexpected<LongValue> b{22};
+        kz::unexpected<IntValue> a{11};
+        kz::unexpected<LongValue> b{22};
         a = b;
         REQUIRE(a.value() == 22);
         REQUIRE(b.value() == 22l);
     }
 
     SECTION("by move with conversion") {
-        mtl::unexpected<IntMoveableValue> a{33};
-        mtl::unexpected<LongMoveableValue> b{44};
+        kz::unexpected<IntMoveableValue> a{33};
+        kz::unexpected<LongMoveableValue> b{44};
         a = std::move(b);
         REQUIRE(a.value() == 44);
         REQUIRE(b.value() == 0l);
@@ -143,19 +145,19 @@ TEST_CASE("unexpected accessors", "[unexpected]") {
 
     SECTION("value() - has value") {
         // &
-        mtl::unexpected<IntValue> a{11};
+        kz::unexpected<IntValue> a{11};
         REQUIRE(a.value() == 11);
 
         // const&
-        const mtl::unexpected<IntValue> b{22};
+        const kz::unexpected<IntValue> b{22};
         REQUIRE(b.value() == 22);
 
         // &&
-        mtl::unexpected<IntValue> c{33};
+        kz::unexpected<IntValue> c{33};
         REQUIRE(std::move(c).value() == 33);
 
         // const&&
-        const mtl::unexpected<IntValue> d{44};
+        const kz::unexpected<IntValue> d{44};
         REQUIRE(std::move(d).value() == 44);
     }
 }
@@ -163,8 +165,8 @@ TEST_CASE("unexpected accessors", "[unexpected]") {
 TEST_CASE("unexpected swap", "[unexpected]") {
 
     SECTION("member swap()") {
-        mtl::unexpected<IntValue> a{3};
-        mtl::unexpected<IntValue> b{7};
+        kz::unexpected<IntValue> a{3};
+        kz::unexpected<IntValue> b{7};
 
         a.swap(b);
 
@@ -173,8 +175,8 @@ TEST_CASE("unexpected swap", "[unexpected]") {
     }
 
     SECTION("std::swap") {
-        mtl::unexpected<IntValue> a{100};
-        mtl::unexpected<IntValue> b{200};
+        kz::unexpected<IntValue> a{100};
+        kz::unexpected<IntValue> b{200};
 
         using std::swap;
         swap(a, b);
@@ -187,18 +189,18 @@ TEST_CASE("unexpected swap", "[unexpected]") {
 TEST_CASE("unexpected comparisons", "[unexpected]") {
 
     SECTION("==") {
-        mtl::unexpected<IntValue> a{44};
-        mtl::unexpected<IntValue> b{44};
-        mtl::unexpected<IntValue> c{55};
+        kz::unexpected<IntValue> a{44};
+        kz::unexpected<IntValue> b{44};
+        kz::unexpected<IntValue> c{55};
 
         REQUIRE(a == b);
         REQUIRE(!(a == c));
     }
 
     SECTION("!=") {
-        mtl::unexpected<IntValue> a{66};
-        mtl::unexpected<IntValue> b{66};
-        mtl::unexpected<IntValue> c{77};
+        kz::unexpected<IntValue> a{66};
+        kz::unexpected<IntValue> b{66};
+        kz::unexpected<IntValue> c{77};
 
         REQUIRE(a != c);
         REQUIRE(!(a != b));

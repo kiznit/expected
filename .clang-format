@@ -1,6 +1,11 @@
-BasedOnStyle: LLVM
+#DisableFormat: true
 
+BasedOnStyle: LLVM
 SortIncludes: false
+
+# PointerAlignment
+AlignAfterOpenBracket: DontAlign
+AlwaysBreakTemplateDeclarations: Yes
 
 # Indentation
 IndentWidth: 4

@@ -27,46 +27,4 @@
 
 #pragma once
 
-#if !defined(MTL_EXCEPTIONS)
-// Determine if exceptions are enabled
-#if __cpp_exceptions >= 199711l
-#define MTL_EXCEPTIONS 1
-#elif __EXCEPTIONS
-#define MTL_EXCEPTIONS 1
-#elif _CPPUNWIND
-#define MTL_EXCEPTIONS 1
-#endif
-#endif
-
-#if MTL_EXCEPTIONS
-
-#include <exception>
-
-namespace mtl {
-
-    template <class E> class bad_expected_access;
-
-    template <> class bad_expected_access<void> : public std::exception {
-    public:
-        explicit bad_expected_access() {}
-        const char* what() const noexcept override {
-            return "mtl::bad_expected_access<>";
-        }
-    };
-
-    template <class E>
-    class bad_expected_access : public bad_expected_access<void> {
-    public:
-        explicit bad_expected_access(E e) : _error(e) {}
-        E& error() & { return _error; }
-        const E& error() const& { return _error; }
-        E&& error() && { return std::move(_error); }
-        const E&& error() const&& { return std::move(_error); }
-
-    private:
-        E _error;
-    };
-
-} // namespace mtl
-
-#endif
+#include <kz/expected_bits/expected.hpp>

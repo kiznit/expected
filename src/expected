@@ -27,23 +27,24 @@
 
 #pragma once
 
-#include <metal/expected.hpp>
+#include <kz/expected.hpp>
 
 namespace std {
 
-#if _MSC_VER || !MTL_EXCEPTIONS
+#if _MSC_VER || !KZ_EXCEPTIONS
 
-    using namespace mtl;
+    using namespace kz;
 
 #else
     // With GCC, clang and mingw, we cannot import or define std::unexpected in
     // namespace std as there is alreaydy a function with that name. For this
-    // reason, we import as much as we need and import mtl::unexpected as
+    // reason, we import as much as we need and import kz::unexpected as
     // std::unexpected_.
-    using mtl::bad_expected_access;
-    using mtl::expected;
-    template <typename E> using unexpected_ = mtl::unexpected<E>;
-    using mtl::unexpect;
+    using kz::bad_expected_access;
+    using kz::expected;
+    template <typename E>
+    using unexpected_ = kz::unexpected<E>;
+    using kz::unexpect;
 
 #endif
 

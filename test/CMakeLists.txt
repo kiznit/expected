@@ -23,7 +23,8 @@ endif()
 set(SRC
     catch2main.cpp
     expected.test.cpp
-    unexpected.test.cpp
+    old.expected.test.cpp
+    old.unexpected.test.cpp
 )
 
 # Unit tests with exception handling
@@ -64,6 +65,6 @@ set_target_properties(
         CMAKE_CXX_STANDARD_REQUIRED True
 )
 
-target_compile_options(expected-test-no-exceptions PRIVATE ${CXX_FLAGS} ${CXX_FLAGS_NO_EXCEPTIONS} -DMTL_EXCEPTIONS=0)
+target_compile_options(expected-test-no-exceptions PRIVATE ${CXX_FLAGS} ${CXX_FLAGS_NO_EXCEPTIONS} -DKZ_EXCEPTIONS=0)
 
 add_test(NAME expected-no-exceptions COMMAND expected-test-no-exceptions)

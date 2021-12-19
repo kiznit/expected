@@ -27,4 +27,50 @@
 
 #pragma once
 
-#include <metal/expected_bits/expected.hpp>
+#if !defined(KZ_EXCEPTIONS)
+// Determine if exceptions are enabled
+#if __cpp_exceptions >= 199711l
+#define KZ_EXCEPTIONS 1
+#elif __EXCEPTIONS
+#define KZ_EXCEPTIONS 1
+#elif _CPPUNWIND
+#define KZ_EXCEPTIONS 1
+#endif
+#endif
+
+#if KZ_EXCEPTIONS
+
+#include <exception>
+
+namespace kz {
+
+    template <class E>
+    class bad_expected_access;
+
+    // �.�.7 Class bad_expected_access<void> [expected.bad_expected_access_base]
+    template <>
+    class bad_expected_access<void> : public std::exception {
+    public:
+        explicit bad_expected_access() {}
+        const char* what() const noexcept override {
+            return "kz::bad_expected_access<>";
+        }
+    };
+
+    // �.�.6 Template Class bad_expected_access [expected.bad_expected_access]
+    template <class E>
+    class bad_expected_access : public bad_expected_access<void> {
+    public:
+        explicit bad_expected_access(E e) : _error(e) {}
+        E& error() & { return _error; }
+        const E& error() const& { return _error; }
+        E&& error() && { return std::move(_error); }
+        const E&& error() const&& { return std::move(_error); }
+
+    private:
+        E _error;
+    };
+
+} // namespace kz
+
+#endif
