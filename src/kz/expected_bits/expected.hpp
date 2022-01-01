@@ -29,6 +29,7 @@
 
 #include <kz/expected_bits/exception.hpp>
 #include <kz/expected_bits/expected_storage.hpp>
+#include <memory>
 
 namespace kz {
 

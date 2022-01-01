@@ -28,6 +28,7 @@
 #pragma once
 
 #include <kz/expected_bits/unexpected.hpp>
+#include <memory>
 
 namespace kz {
 
