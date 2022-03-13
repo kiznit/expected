@@ -1,6 +1,6 @@
 # std::expected
 
-This is an implementation of std::expected as proposed in [P0323R10](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0323r10.html).
+This is an implementation of std::expected as proposed in [P0323R11](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0323r11.html).
 
 Follow the proposal as close as possible. Don't try to abstract things like constraints, abstractions are leaky and can be a source of error. Adding all the constraints as specified by the proposal can be very noisy, but it makes it easier to verify that the code matches what the proposal says.
 
@@ -13,11 +13,11 @@ Testing is done using different versions of GCC, clang, mingw and MSVC. You can 
 
 - Requires C++ 20 (some might not consider this a feature).
 - Works with or without C++ exceptions enabled.
-- Follows the [P0323R10](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0323r10.html) proposal as closely as possible.
+- Follows the [P0323R11](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0323r11.html) proposal as closely as possible.
 
 ## namespace std
 
-The current proposal for expected, [P0323R10](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0323r10.html), specifies that all the code should reside in namespace std. I would love to do so, but unfortunately **std::unexpected** conflicts with a deprecated function with the same name on multiple compiles (GCC 10-13, clang 11-13, mingw 10-11). For these reasons it is simply not possible to do so eveywhere when exceptions are enabled. If you still want to use **std::except** instead of **kz::except**, you can do so by including **<expected>**. Everything that can be imported into the **std** namespace will be. `**std::unexpected** will become **std::unexpected_** where the conflict exists.
+The current proposal for expected, [P0323R11](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0323r11.html), specifies that all the code should reside in namespace std. I would love to do so, but unfortunately **std::unexpected** conflicts with a deprecated function with the same name on multiple compiles (GCC 10-13, clang 11-13, mingw 10-11). For these reasons it is simply not possible to do so eveywhere when exceptions are enabled. If you still want to use **std::except** instead of **kz::except**, you can do so by including **<expected>**. Everything that can be imported into the **std** namespace will be. `**std::unexpected** will become **std::unexpected_** where the conflict exists.
 
 ## Is this library ready for use?
 
@@ -26,6 +26,7 @@ Yes it is. Although it is labelled as "preview", it is fully functional and used
 ## TODO
 - Generate code coverage and publish it somewhere?
 - Refactor/rewrite unit tests and get to 100% coverage
-- Support for C++17? C++14?
 - Fix formatting: clang-format cannot handle requires() properly
-- Optimize for trivial copy/move constructors and trivial copy/move assignments
+- Update to P0323R12 when it is published
+- Follow p2549r0 http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2549r0.html
+

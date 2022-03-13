@@ -23,8 +23,8 @@ endif()
 set(SRC
     catch2main.cpp
     expected.test.cpp
+    unexpected.test.cpp
     old.expected.test.cpp
-    old.unexpected.test.cpp
 )
 
 # Unit tests with exception handling

@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2021, Thierry Tremblay
+    Copyright (c) 2022, Thierry Tremblay
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -47,25 +47,31 @@ namespace kz {
     template <class E>
     class bad_expected_access;
 
-    // �.�.7 Class bad_expected_access<void> [expected.bad_expected_access_base]
     template <>
     class bad_expected_access<void> : public std::exception {
+    protected:
+        bad_expected_access() = default;
+        bad_expected_access(const bad_expected_access&) = default;
+        bad_expected_access(bad_expected_access&&) = default;
+        bad_expected_access& operator=(const bad_expected_access&) = default;
+        bad_expected_access& operator=(bad_expected_access&&) = default;
+        ~bad_expected_access() = default;
+
     public:
-        explicit bad_expected_access() {}
         const char* what() const noexcept override {
             return "kz::bad_expected_access<>";
         }
     };
 
-    // �.�.6 Template Class bad_expected_access [expected.bad_expected_access]
     template <class E>
     class bad_expected_access : public bad_expected_access<void> {
     public:
-        explicit bad_expected_access(E e) : _error(e) {}
-        E& error() & { return _error; }
-        const E& error() const& { return _error; }
-        E&& error() && { return std::move(_error); }
-        const E&& error() const&& { return std::move(_error); }
+        explicit bad_expected_access(E e) : _error(std::move(e)) {}
+
+        E& error() & noexcept { return _error; }
+        const E& error() const& noexcept { return _error; }
+        E&& error() && noexcept { return std::move(_error); }
+        const E&& error() const&& noexcept { return std::move(_error); }
 
     private:
         E _error;

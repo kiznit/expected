@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2021, Thierry Tremblay
+    Copyright (c) 2022, Thierry Tremblay
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@ struct Value {
     template <typename U>
     Value(const Value<U>& x) noexcept : value(x.value) {}
 
-    ~Value() { value = 0; }
+    ~Value() noexcept { value = 0; }
 
     T value;
 
@@ -84,7 +84,7 @@ struct MoveableValue {
     MoveableValue(const MoveableValue&) = delete;
     MoveableValue& operator=(const MoveableValue&) = delete;
 
-    ~MoveableValue() { value = 0; }
+    ~MoveableValue() noexcept { value = 0; }
 
     T value;
     bool throwsOnMove{false};
@@ -114,10 +114,11 @@ using LongMoveableValue = MoveableValue<long>;
 using DefaultInt = Default<int>;
 
 struct ComplexThing {
-    ComplexThing(const IntValue& a, IntMoveableValue&& b)
+    ComplexThing(const IntValue& a, IntMoveableValue&& b) noexcept
         : a(a), b(std::move(b)) {}
 
-    ComplexThing(std::vector<int> list, const IntValue& a, IntMoveableValue&& b)
+    ComplexThing(
+        std::vector<int> list, const IntValue& a, IntMoveableValue&& b) noexcept
         : list(list), a(a), b(std::move(b)) {}
 
     std::vector<int> list;
@@ -127,9 +128,9 @@ struct ComplexThing {
 
 struct AssignableComplexThing : ComplexThing {
 
-    template <typename... Args>
-    requires(sizeof...(Args) > 1) AssignableComplexThing(Args&&... args)
-        : ComplexThing(std::forward<Args>(args)...) {}
+    AssignableComplexThing(
+        std::vector<int> list, const IntValue& a, IntMoveableValue&& b)
+        : ComplexThing(list, a, std::move(b)) {}
 
     AssignableComplexThing(const AssignableComplexThing& other)
         : ComplexThing(other.list, other.a, IntMoveableValue(other.b.value)),
@@ -156,8 +157,24 @@ struct NotNoThrowConstructible {
     explicit NotNoThrowConstructible(const NotNoThrowConstructible& other)
         : value(other.value) {}
 
+    NotNoThrowConstructible(NotNoThrowConstructible&& rhs) noexcept {
+        value = rhs.value;
+        rhs.value = -1;
+    }
+
     NotNoThrowConstructible& operator=(
         const NotNoThrowConstructible&) = default;
 
     int value;
+};
+
+struct SimpleThing {
+    SimpleThing(int x, int y) noexcept : n(0), x(x), y(y) {}
+
+    SimpleThing(std::initializer_list<int> list, int x, int y) noexcept
+        : n(list.size()), x(x), y(y) {}
+
+    size_t n;
+    int x;
+    int y;
 };

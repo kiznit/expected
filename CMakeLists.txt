@@ -1,9 +1,11 @@
-cmake_minimum_required(VERSION 3.14)
+# Version 3.22 is likely not a strict requirement.
+# cmake 3.22 is happy if we specify 3.16, but cmake 3.16 doesn't work.
+cmake_minimum_required(VERSION 3.22)
 
 project(std_expected
     HOMEPAGE_URL https://github.com/kiznit/expected
-    DESCRIPTION "C++ implementation of std::expected as proposed in P0323R10"
-    VERSION 0.1
+    DESCRIPTION "C++ implementation of std::expected as proposed in P0323R11"
+    VERSION 0.11.0
     LANGUAGES CXX)
 
 option(expected_BUILD_TESTS "Build tests" ON)

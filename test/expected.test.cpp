@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2021, Thierry Tremblay
+    Copyright (c) 2022, Thierry Tremblay
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
 
 enum class Error { FileNotFound, IOError, FlyingSquirrels };
 
-TEST_CASE("expected types") {
+TEST_CASE("static assertions", "[expected]") {
     using T = std::expected<short, bool>;
     static_assert(std::is_same_v<T::value_type, short>);
     static_assert(std::is_same_v<T::error_type, bool>);
@@ -41,7 +41,7 @@ TEST_CASE("expected types") {
     static_assert(std::is_void_v<U::value_type>);
 }
 
-TEST_CASE("rebind<>") {
+TEST_CASE("rebind<>", "[expected]") {
     using T = std::expected<short, bool>;
     using U = T::rebind<long>;
     static_assert(std::is_same_v<U::value_type, long>);
@@ -53,9 +53,9 @@ TEST_CASE("rebind<>") {
     static_assert(std::is_same_v<W::error_type, bool>);
 }
 
-// TODO: tests with const/volatile/cv T and E
+// TODO: how do we speciailize cv void? do we need to do anything?
 
-TEST_CASE("Default constructor") {
+TEST_CASE("Default constructor", "[expected]") {
     SECTION("T is default-constructible") {
         using Type = std::expected<DefaultConstructible, Error>;
         static_assert(std::is_default_constructible_v<Type>);
@@ -66,10 +66,10 @@ TEST_CASE("Default constructor") {
         REQUIRE(a->value == DefaultConstructible::DefaultValue);
     }
 
-    SECTION("T is not default-constructible") {
-        using Type = std::expected<NotDefaultConstructible, Error>;
-        static_assert(!std::is_default_constructible_v<Type>);
-    }
+    // SECTION("T is not default-constructible") {
+    //     using Type = std::expected<NotDefaultConstructible, Error>;
+    //     static_assert(!std::is_constructible_v<Type>);
+    // }
 
     SECTION("T is void") {
         using Type = std::expected<void, Error>;
@@ -85,6 +85,7 @@ TEST_CASE("Copy constructor") {
     SECTION("T and E are copy-constructible") {
         using Type = std::expected<CopyConstructible, CopyConstructible>;
         static_assert(std::is_copy_constructible_v<Type>);
+
         const Type a(42);
         const Type b(a);
 
@@ -97,6 +98,7 @@ TEST_CASE("Copy constructor") {
     SECTION("T is void and E is copy-constructible") {
         using Type = std::expected<void, CopyConstructible>;
         static_assert(std::is_copy_constructible_v<Type>);
+
         const Type a;
         const Type b(a);
 
@@ -115,6 +117,32 @@ TEST_CASE("Copy constructor") {
         static_assert(!std::is_copy_constructible_v<Type3>);
         static_assert(!std::is_copy_constructible_v<Type4>);
     }
+
+#if KZ_P0848R3
+    SECTION("T and E are trivially-copy-constructible") {
+        using Type1 = std::expected<int, Error>;
+        static_assert(std::is_copy_constructible_v<Type1>);
+        static_assert(std::is_trivially_copy_constructible_v<Type1>);
+
+        using Type2 = std::expected<void, Error>;
+        static_assert(std::is_copy_constructible_v<Type2>);
+        static_assert(std::is_trivially_copy_constructible_v<Type2>);
+    }
+
+    SECTION("T or E is not trivially-copy-constructible") {
+        using Type1 = std::expected<std::vector<int>, Error>;
+        static_assert(std::is_copy_constructible_v<Type1>);
+        static_assert(!std::is_trivially_copy_constructible_v<Type1>);
+
+        using Type2 = std::expected<int, std::vector<int>>;
+        static_assert(std::is_copy_constructible_v<Type2>);
+        static_assert(!std::is_trivially_copy_constructible_v<Type2>);
+
+        using Type3 = std::expected<void, std::vector<int>>;
+        static_assert(std::is_copy_constructible_v<Type3>);
+        static_assert(!std::is_trivially_copy_constructible_v<Type3>);
+    }
+#endif
 }
 
 TEST_CASE("Move constructor") {
@@ -151,6 +179,32 @@ TEST_CASE("Move constructor") {
         static_assert(!std::is_move_constructible_v<Type3>);
         static_assert(!std::is_move_constructible_v<Type4>);
     }
+
+#if KZ_P0848R3
+    SECTION("T and E are trivially-move-constructible") {
+        using Type1 = std::expected<int, Error>;
+        static_assert(std::is_move_constructible_v<Type1>);
+        static_assert(std::is_trivially_move_constructible_v<Type1>);
+
+        using Type2 = std::expected<void, Error>;
+        static_assert(std::is_move_constructible_v<Type2>);
+        static_assert(std::is_trivially_move_constructible_v<Type2>);
+    }
+
+    SECTION("T or E is not trivially-move-constructible") {
+        using Type1 = std::expected<std::vector<int>, Error>;
+        static_assert(std::is_move_constructible_v<Type1>);
+        static_assert(!std::is_trivially_move_constructible_v<Type1>);
+
+        using Type2 = std::expected<int, std::vector<int>>;
+        static_assert(std::is_move_constructible_v<Type2>);
+        static_assert(!std::is_trivially_move_constructible_v<Type2>);
+
+        using Type3 = std::expected<void, std::vector<int>>;
+        static_assert(std::is_move_constructible_v<Type3>);
+        static_assert(!std::is_trivially_move_constructible_v<Type3>);
+    }
+#endif
 }
 
 TEST_CASE("Conversion copy constructor") {
@@ -314,7 +368,7 @@ TEST_CASE("Construct using unexpect_t") {
     // TODO: more tests
 }
 
-TEST_CASE("Constrcut using unexpect_t and initializer_list") {
+TEST_CASE("Construct using unexpect_t and initializer_list") {
     SECTION("no extra params") {
         using Type = std::expected<int, std::vector<int>>;
         Type a(std::unexpect, {1, 2, 3, 4});
@@ -326,18 +380,144 @@ TEST_CASE("Constrcut using unexpect_t and initializer_list") {
     // TODO: more tests, including with extra params
 }
 
-TEST_CASE("Destructor") {
-    using Type1 = std::expected<int, Error>;
-    using Type2 = std::expected<void, Error>;
-    using Type3 = std::expected<std::vector<int>, Error>;
-    using Type4 = std::expected<int, std::vector<int>>;
-    using Type5 = std::expected<void, std::vector<int>>;
-
-    static_assert(std::is_trivially_destructible_v<Type1>);
-    static_assert(std::is_trivially_destructible_v<Type2>);
-    static_assert(!std::is_trivially_destructible_v<Type3>);
-    static_assert(!std::is_trivially_destructible_v<Type4>);
-    static_assert(!std::is_trivially_destructible_v<Type5>);
-
+TEST_CASE("Destructor", "[expected]") {
     // TODO: verify destructors for T and E are called
+
+#if KZ_P0848R3
+    SECTION("trivial destructor") {
+        using Type1 = std::expected<int, Error>;
+        using Type2 = std::expected<void, Error>;
+        using Type3 = std::expected<std::vector<int>, Error>;
+        using Type4 = std::expected<int, std::vector<int>>;
+        using Type5 = std::expected<void, std::vector<int>>;
+
+        static_assert(std::is_trivially_destructible_v<Type1>);
+        static_assert(std::is_trivially_destructible_v<Type2>);
+        static_assert(!std::is_trivially_destructible_v<Type3>);
+        static_assert(!std::is_trivially_destructible_v<Type4>);
+        static_assert(!std::is_trivially_destructible_v<Type5>);
+    }
+#endif
+}
+
+TEST_CASE("observers", "[expected]") {
+
+    SECTION("operator bool / has_value()") {
+        kz::expected<int, Error> a{123};
+        kz::expected<int, Error> b{kz::unexpected(Error::FlyingSquirrels)};
+        REQUIRE(a);
+        REQUIRE(a.has_value());
+        REQUIRE(!b);
+        REQUIRE(!b.has_value());
+
+        kz::expected<void, Error> c;
+        kz::expected<void, Error> d{kz::unexpected(Error::FlyingSquirrels)};
+        REQUIRE(c);
+        REQUIRE(c.has_value());
+        REQUIRE(!d);
+        REQUIRE(!d.has_value());
+    }
+
+    SECTION("operator->()") {
+        kz::expected<CopyConstructible, Error> a{11};
+        REQUIRE(a->value == 11);
+
+        *a.operator->() = 22;
+        REQUIRE(a->value == 22);
+
+        const kz::expected<CopyConstructible, Error> b{33};
+        REQUIRE(b->value == 33);
+    }
+
+    SECTION("operator*()") {
+        // &
+        kz::expected<int, Error> a{11};
+        REQUIRE(*a == 11);
+
+        // const&
+        const kz::expected<int, Error> b{22};
+        REQUIRE(*b == 22);
+
+        // &&
+        kz::expected<int, Error> c{33};
+        REQUIRE(*std::move(c) == 33);
+
+        // const&&
+        const kz::expected<int, Error> d{44};
+        REQUIRE(*std::move(d) == 44);
+    }
+
+    SECTION("value() - has value") {
+        // &
+        kz::expected<int, Error> a{11};
+        REQUIRE(a.value() == 11);
+
+        // const&
+        const kz::expected<int, Error> b{22};
+        REQUIRE(b.value() == 22);
+
+        // &&
+        kz::expected<int, Error> c{33};
+        REQUIRE(std::move(c).value() == 33);
+
+        // const&&
+        const kz::expected<int, Error> d{44};
+        REQUIRE(std::move(d).value() == 44);
+    }
+
+#if KZ_EXCEPTIONS
+    SECTION("value() - has error") {
+        // &
+        kz::expected<int, Error> a{kz::unexpected(Error::FileNotFound)};
+        REQUIRE_THROWS_AS(a.value(), kz::bad_expected_access<Error>);
+
+        // const&
+        const kz::expected<int, Error> b{kz::unexpected(Error::FileNotFound)};
+        REQUIRE_THROWS_AS(b.value(), kz::bad_expected_access<Error>);
+
+        // &&
+        kz::expected<int, Error> c{kz::unexpected(Error::FileNotFound)};
+        REQUIRE_THROWS_AS(std::move(c).value(), kz::bad_expected_access<Error>);
+
+        // const&&
+        const kz::expected<int, Error> d{kz::unexpected(Error::FileNotFound)};
+        REQUIRE_THROWS_AS(std::move(d).value(), kz::bad_expected_access<Error>);
+    }
+#endif
+
+    SECTION("error()") {
+        // &
+        kz::expected<int, int> a{kz::unexpected{11}};
+        REQUIRE(a.error() == 11);
+
+        // const&
+        const kz::expected<int, int> b{kz::unexpected{22}};
+        REQUIRE(b.error() == 22);
+
+        // &&
+        kz::expected<int, int> c{kz::unexpected{33}};
+        REQUIRE(std::move(c).error() == 33);
+
+        // const&&
+        const kz::expected<int, int> d{kz::unexpected{44}};
+        REQUIRE(std::move(d).error() == 44);
+    }
+
+    SECTION("value_or()") {
+        // value - const&
+        const kz::expected<int, Error> a{31};
+        REQUIRE(a.value_or(42) == 31);
+
+        // error - const&
+        const kz::expected<int, Error> b{kz::unexpected(Error::IOError)};
+        REQUIRE(b.value_or(42) == 42);
+
+        // value - &&
+        kz::expected<int, Error> c{69};
+        REQUIRE(std::move(c).value_or(777) == 69);
+
+        // error - &&
+        kz::expected<int, Error> d{kz::unexpected(Error::FileNotFound)};
+        REQUIRE(std::move(d).value_or(84) == 84);
+    }
 }

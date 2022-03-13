@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2021, Thierry Tremblay
+    Copyright (c) 2022, Thierry Tremblay
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -27,19 +27,65 @@
 
 #pragma once
 
-#include <kz/expected_bits/exception.hpp>
-#include <kz/expected_bits/expected_storage.hpp>
 #include <memory>
+#include <kz/expected_bits/exception.hpp>
+#include <kz/expected_bits/unexpected.hpp>
+
+// clang does not suport P0848R3. Details at
+// https://clang.llvm.org/cxx_status.html#cxx20.
+#if defined(__clang__)
+#define KZ_P0848R3 0
+#else
+#define KZ_P0848R3 1
+#endif
 
 namespace kz {
+    namespace detail {
 
-    using std::in_place;
+#if KZ_EXCEPTIONS
 
-    // �.�.4 Class template expected [expected.expected]
+        template <typename T, typename U, class... Args>
+        constexpr void reinit_expected(T& newval, U& oldval, Args&&... args) {
+            if constexpr (std::is_nothrow_constructible_v<T, Args...>) {
+                std::destroy_at(std::addressof(oldval));
+                std::construct_at(
+                    std::addressof(newval), std::forward<Args>(args)...);
+            } else if constexpr (std::is_nothrow_move_constructible_v<T>) {
+                T tmp(std::forward<Args>(args)...);
+                std::destroy_at(std::addressof(oldval));
+                std::construct_at(std::addressof(newval), std::move(tmp));
+            } else {
+                U tmp(std::move(oldval));
+                std::destroy_at(std::addressof(oldval));
+                try {
+                    std::construct_at(
+                        std::addressof(newval), std::forward<Args>(args)...);
+                } catch (...) {
+                    std::construct_at(std::addressof(oldval), std::move(tmp));
+                    throw;
+                }
+            }
+        }
+
+#else
+
+        template <typename T, typename U, class... Args>
+        constexpr void reinit_expected(T& newval, U& oldval, Args&&... args) {
+            std::destroy_at(std::addressof(oldval));
+            std::construct_at(
+                std::addressof(newval), std::forward<Args>(args)...);
+        }
+
+#endif
+
+    } // namespace detail
+
+    /*
+        expected
+    */
+
     template <typename T, typename E>
-    requires(!std::is_same_v<T, unexpected<E>>) class expected
-        : private detail::expected_storage<T, E>,
-          private detail::expected_default_constructors<T, E> {
+    class expected {
     public:
         using value_type = T;
         using error_type = E;
@@ -48,456 +94,822 @@ namespace kz {
         template <typename U>
         using rebind = expected<U, error_type>;
 
-        // �.�.4.1 Constructors [expected.object.ctor]
-        constexpr expected() = default;
-        constexpr expected(const expected& rhs) = default;
-        constexpr expected(expected&& rhs) = default;
+        // Constructors
 
-        template <typename U, typename G>
-        requires(
-            std::is_constructible_v<T, const U&> &&
-            !std::is_constructible_v<T, expected<U, G>&> &&
-            !std::is_constructible_v<T, expected<U, G>&&> &&
-            !std::is_constructible_v<T, const expected<U, G>&> &&
-            !std::is_constructible_v<T, const expected<U, G>&&> &&
-            !std::is_convertible_v<expected<U, G>&, T> &&
-            !std::is_convertible_v<expected<U, G>&&, T> &&
-            !std::is_convertible_v<const expected<U, G>&, T> &&
-            !std::is_convertible_v<const expected<U, G>&&, T> &&
-            std::is_constructible_v<E, const G&> &&
-            !std::is_constructible_v<unexpected<E>, expected<U, G>&> &&
-            !std::is_constructible_v<unexpected<E>, expected<U, G>&&> &&
-            !std::is_constructible_v<unexpected<E>, const expected<U, G>&> &&
-            !std::is_constructible_v<unexpected<E>, const expected<U, G>&&> &&
-            !std::is_convertible_v<expected<U, G>&, unexpected<E>> &&
-            !std::is_convertible_v<expected<U, G>&&, unexpected<E>> &&
-            !std::is_convertible_v<const expected<U, G>&, unexpected<E>> &&
-            !std::is_convertible_v<const expected<U, G>&&,
-                unexpected<
-                    E>>) explicit((!std::is_void_v<T> && !std::is_void_v<U> &&
-                                      !std::is_convertible_v<const U&, T>) ||
-                                  !std::is_convertible_v<const G&,
-                                      E>) constexpr expected(const expected<U,
-            G>& rhs)
-            : detail::expected_storage<T, E>(rhs) {}
+        constexpr expected() requires(std::is_default_constructible_v<T>)
+            : _value(), _has_value(true) {}
+
+#if KZ_P0848R3
+        constexpr expected(const expected& rhs) requires(
+            std::is_copy_constructible_v<T>&& std::is_copy_constructible_v<E> &&
+            !(std::is_trivially_copy_constructible_v<T> &&
+                std::is_trivially_copy_constructible_v<E>)) {
+            if (rhs._has_value) {
+                construct_value(rhs._value);
+            } else {
+                construct_error(rhs._error);
+            }
+        }
+        constexpr expected(const expected&) requires(
+            std::is_trivially_copy_constructible_v<T>&&
+                std::is_trivially_copy_constructible_v<E>) = default;
+
+        constexpr expected(const expected&) requires(
+            !std::is_copy_constructible_v<E>) = delete;
+#else
+        constexpr expected(const expected& rhs) requires(
+            std::is_copy_constructible_v<T>&& std::is_copy_constructible_v<E>) {
+            if (rhs._has_value) {
+                construct_value(rhs._value);
+            } else {
+                construct_error(rhs._error);
+            }
+        }
+#endif
+
+#if KZ_P0848R3
+        constexpr expected(expected&& rhs) requires(
+            std::is_move_constructible_v<T>&& std::is_move_constructible_v<E> &&
+            !(std::is_trivially_move_constructible_v<T> &&
+                std::is_trivially_move_constructible_v<E>)) {
+            if (rhs._has_value) {
+                construct_value(std::move(rhs._value));
+            } else {
+                construct_error(std::move(rhs._error));
+            }
+        }
+
+        constexpr expected(expected&&) requires(
+            std::is_trivially_move_constructible_v<T>&&
+                std::is_trivially_move_constructible_v<E>) = default;
+#else
+        constexpr expected(expected&& rhs) requires(
+            std::is_move_constructible_v<T>&& std::is_move_constructible_v<E>) {
+            if (rhs._has_value) {
+                construct_value(std::move(rhs._value));
+            } else {
+                construct_error(std::move(rhs._error));
+            }
+        }
+#endif
 
         template <typename G>
-        requires(
-            std::is_void_v<T>&& std::is_constructible_v<E, const G&> &&
-            !std::is_constructible_v<unexpected<E>, expected<void, G>&> &&
-            !std::is_constructible_v<unexpected<E>, expected<void, G>&&> &&
-            !std::is_constructible_v<unexpected<E>, const expected<void, G>&> &&
-            !std::is_constructible_v<unexpected<E>,
-                const expected<void, G>&&> &&
-            !std::is_convertible_v<expected<void, G>&, unexpected<E>> &&
-            !std::is_convertible_v<expected<void, G>&&, unexpected<E>> &&
-            !std::is_convertible_v<const expected<void, G>&, unexpected<E>> &&
-            !std::is_convertible_v<const expected<void, G>&&,
-                unexpected<
-                    E>>) explicit(!std::is_convertible_v<const G&,
-                                  E>) constexpr expected(const expected<void,
-            G>& rhs)
-            : detail::expected_storage<void, E>(rhs) {}
-
-        template <typename U, typename G>
-        requires(
-            std::is_constructible_v<T, U&&> &&
-            !std::is_constructible_v<T, expected<U, G>&> &&
-            !std::is_constructible_v<T, expected<U, G>&&> &&
-            !std::is_constructible_v<T, const expected<U, G>&> &&
-            !std::is_constructible_v<T, const expected<U, G>&&> &&
-            !std::is_convertible_v<expected<U, G>&, T> &&
-            !std::is_convertible_v<expected<U, G>&&, T> &&
-            !std::is_convertible_v<const expected<U, G>&, T> &&
-            !std::is_convertible_v<const expected<U, G>&&, T> &&
-            std::is_constructible_v<E, G&&> &&
-            !std::is_constructible_v<unexpected<E>, expected<U, G>&> &&
-            !std::is_constructible_v<unexpected<E>, expected<U, G>&&> &&
-            !std::is_constructible_v<unexpected<E>, const expected<U, G>&> &&
-            !std::is_constructible_v<unexpected<E>, const expected<U, G>&&> &&
-            !std::is_convertible_v<expected<U, G>&, unexpected<E>> &&
-            !std::is_convertible_v<expected<U, G>&&, unexpected<E>> &&
-            !std::is_convertible_v<const expected<U, G>&, unexpected<E>> &&
-            !std::is_convertible_v<const expected<U, G>&&, unexpected<E>>)
-
-            explicit((!std::is_void_v<T> && !std::is_void_v<U> &&
-                         !std::is_convertible_v<U&&, T>) ||
-                     !std::is_convertible_v<G&&,
-                         E>) constexpr expected(expected<U, G>&& rhs)
-            : detail::expected_storage<T, E>(std::move(rhs)) {}
+        constexpr explicit(!std::is_convertible_v<const G&, E>)
+            expected(const unexpected<G>& e) requires(
+                std::is_constructible_v<E, const G&>)
+            : _error(std::forward<const G&>(e.value())), _has_value(false) {}
 
         template <typename G>
-        requires(
-            std::is_void_v<T>&& std::is_constructible_v<E, G&&> &&
-            !std::is_constructible_v<unexpected<E>, expected<void, G>&> &&
-            !std::is_constructible_v<unexpected<E>, expected<void, G>&&> &&
-            !std::is_constructible_v<unexpected<E>, const expected<void, G>&> &&
-            !std::is_constructible_v<unexpected<E>,
-                const expected<void, G>&&> &&
-            !std::is_convertible_v<expected<void, G>&, unexpected<E>> &&
-            !std::is_convertible_v<expected<void, G>&&, unexpected<E>> &&
-            !std::is_convertible_v<const expected<void, G>&, unexpected<E>> &&
-            !std::is_convertible_v<const expected<void, G>&&,
-                unexpected<E>>) explicit(!std::is_convertible_v<G&&,
-                                         E>) constexpr expected(expected<void,
-            G>&& rhs)
-            : detail::expected_storage<T, E>(std::move(rhs)) {}
+        constexpr explicit(!std::is_convertible_v<G, E>)
+            expected(unexpected<G>&& e) requires(std::is_constructible_v<E, G>)
+            : _error(std::forward<G>(e.value())), _has_value(false) {}
 
         template <typename U = T>
-        requires(std::is_constructible_v<T, U&&> &&
-                 !std::is_same_v<std::remove_cvref_t<U>, in_place_t> &&
-                 !std::is_same_v<std::remove_cvref_t<U>, expected<T, E>> &&
-                 !std::is_same_v<std::remove_cvref_t<U>,
-                     unexpected<E>>) explicit(!std::is_convertible_v<U&&,
-                                              T>) constexpr expected(U&& v)
-            : detail::expected_storage<T, E>(in_place, std::forward<U>(v)) {}
+        constexpr explicit(!std::is_convertible_v<U, T>)
+            expected(U&& v) requires(
+                !std::is_same_v<std::remove_cvref_t<U>, in_place_t> &&
+                !std::is_same_v<expected<T, E>, std::remove_cvref_t<U>> &&
+                !std::is_same_v<std::remove_cvref_t<U>, unexpected<E>> &&
+                std::is_constructible_v<T, U>)
+            : _value(std::forward<U>(v)), _has_value(true) {}
 
-        template <typename G = E>
-        requires(std::is_constructible_v<E, const G&>) explicit(
-            !std::is_convertible_v<const G&,
-                E>) constexpr expected(const unexpected<G>& e)
-            : detail::expected_storage<T, E>(unexpect, e) {}
-
-        template <typename G = E>
-        requires(std::is_constructible_v<E, G&&>) explicit(
-            !std::is_convertible_v<G&&, E>) constexpr expected(unexpected<G>&&
-                e) noexcept(std::is_nothrow_constructible_v<E, G&&>)
-            : detail::expected_storage<T, E>(unexpect, std::move(e)) {}
-
-        template <typename... Args>
-        requires((std::is_void_v<T> && sizeof...(Args) == 0) ||
-                 (!std::is_void_v<T> &&
-                     std::is_constructible_v<T,
-                         Args...>)) constexpr explicit expected(in_place_t,
-            Args&&... args)
-            : detail::expected_storage<T, E>(
-                  in_place, std::forward<Args>(args)...) {}
-
-        template <typename U, typename... Args>
-        requires(!std::is_void_v<T> &&
-                 std::is_constructible_v<T, initializer_list<U>&,
-                     Args...>) constexpr explicit expected(in_place_t,
-            initializer_list<U> il, Args&&... args)
-            : detail::expected_storage<T, E>(
-                  in_place, il, std::forward<Args>(args)...) {}
-
-        template <typename... Args>
-        requires(std::is_constructible_v<E,
-            Args...>) constexpr explicit expected(unexpect_t, Args&&... args)
-            : detail::expected_storage<T, E>(
-                  unexpect, in_place, std::forward<Args>(args)...) {}
-
-        template <typename U, typename... Args>
-        requires(std::is_constructible_v<E, initializer_list<U>&,
-            Args...>) constexpr explicit expected(unexpect_t,
-            initializer_list<U> il, Args&&... args)
-            : detail::expected_storage<T, E>(
-                  unexpect, in_place, il, std::forward<Args>(args)...) {}
-
-        // �.�.4.2 Destructor [expected.object.dtor]
-        ~expected() = default;
-
-        // �.�.4.3 Assignment [expected.object.assign]
-        expected& operator=(const expected&) = default;
-        expected& operator=(expected&&) = default;
-
-        template <typename U = T, typename V = T>
-        requires(!std::is_void_v<T> &&
-                 !std::is_same_v<expected<T, E>, std::remove_cvref_t<U>> &&
-                 !std::conjunction_v<std::is_scalar<T>,
-                     std::is_same<T, std::decay_t<U>>> &&
-                 std::is_constructible_v<T, U> && std::is_assignable_v<V&, U> &&
-                 std::is_same_v<T, V> &&
-                 std::is_nothrow_move_constructible_v<E>) expected&
-        operator=(U&& rhs) {
-            detail::expected_storage<T, E>::operator=(std::forward<U>(rhs));
-            return *this;
+        template <typename U, typename G>
+        constexpr explicit(!std::is_convertible_v<const U&, T> ||
+                           !std::is_convertible_v<const G&, E>)
+            expected(const expected<U, G>& rhs) requires(
+                std::is_constructible_v<T, const U&>&&
+                    std::is_constructible_v<E, const G&> &&
+                !std::is_constructible_v<T, expected<U, G>&> &&
+                !std::is_constructible_v<T, expected<U, G>> &&
+                !std::is_constructible_v<T, const expected<U, G>&> &&
+                !std::is_constructible_v<T, const expected<U, G>> &&
+                !std::is_convertible_v<expected<U, G>&, T> &&
+                !std::is_convertible_v<expected<U, G>&&, T> &&
+                !std::is_convertible_v<const expected<U, G>&, T> &&
+                !std::is_convertible_v<const expected<U, G>&&, T> &&
+                !std::is_constructible_v<unexpected<E>, expected<U, G>&> &&
+                !std::is_constructible_v<unexpected<E>, expected<U, G>> &&
+                !std::is_constructible_v<unexpected<E>,
+                    const expected<U, G>&> &&
+                !std::is_constructible_v<unexpected<E>, const expected<U, G>>) {
+            if (bool(rhs)) {
+                construct_value(*rhs);
+            } else {
+                construct_error(rhs.error());
+            }
         }
 
-        template <typename G = E>
-        requires(std::is_nothrow_copy_constructible_v<E>&&
-                std::is_copy_assignable_v<E>) expected&
-        operator=(const unexpected<G>& rhs) {
-            detail::expected_storage<T, E>::operator=(rhs);
-            return *this;
-        }
-
-        template <typename G = E>
-        requires(std::is_nothrow_move_constructible_v<E>&&
-                std::is_move_assignable_v<E>) expected&
-        operator=(unexpected<G>&& rhs) {
-            detail::expected_storage<T, E>::operator=(std::move(rhs));
-            return *this;
-        }
-
-        // �.�.4.4 Modifiers [expected.object.modify]
-        template <typename = void>
-        requires((std::is_void_v<T> ||
-                     std::is_swappable_v<T>)&&std::is_swappable_v<E> &&
-                 (std::is_void_v<T> || std::is_move_constructible_v<T> ||
-                     std::is_move_constructible_v<E>)) void swap(expected&
-                rhs) noexcept(std::is_nothrow_move_constructible_v<T>&&
-                std::is_nothrow_swappable_v<T>&&
-                    std::is_nothrow_move_constructible_v<E>&&
-                        std::is_nothrow_swappable_v<E>) {
-            detail::expected_storage<T, E>::swap(rhs);
-        }
-
-        template <typename = void>
-        requires(std::is_void_v<T>) void emplace() {
-            detail::expected_storage<T, E>::emplace();
+        template <typename U, typename G>
+        constexpr explicit(
+            !std::is_convertible_v<U, T> || !std::is_convertible_v<G, E>)
+            expected(expected<U, G>&& rhs) requires(
+                std::is_constructible_v<T, U>&& std::is_constructible_v<E, G> &&
+                !std::is_constructible_v<T, expected<U, G>&> &&
+                !std::is_constructible_v<T, expected<U, G>> &&
+                !std::is_constructible_v<T, const expected<U, G>&> &&
+                !std::is_constructible_v<T, const expected<U, G>> &&
+                !std::is_convertible_v<expected<U, G>&, T> &&
+                !std::is_convertible_v<expected<U, G>&&, T> &&
+                !std::is_convertible_v<const expected<U, G>&, T> &&
+                !std::is_convertible_v<const expected<U, G>&&, T> &&
+                !std::is_constructible_v<unexpected<E>, expected<U, G>&> &&
+                !std::is_constructible_v<unexpected<E>, expected<U, G>> &&
+                !std::is_constructible_v<unexpected<E>,
+                    const expected<U, G>&> &&
+                !std::is_constructible_v<unexpected<E>, const expected<U, G>>) {
+            if (bool(rhs)) {
+                construct_value(std::move(*rhs));
+            } else {
+                construct_error(std::move(rhs.error()));
+            }
         }
 
         template <typename... Args>
-        requires(!std::is_void_v<T>) auto& emplace(Args&&... args) {
-            return detail::expected_storage<T, E>::emplace(
-                std::forward<Args>(args)...);
-        }
+        constexpr explicit expected(in_place_t, Args&&... args) requires(
+            std::is_constructible_v<T, Args...>)
+            : _value(std::forward<Args>(args)...), _has_value(true) {}
 
         template <typename U, typename... Args>
-        requires(!std::is_void_v<T>) auto& emplace(
-            initializer_list<U> il, Args&&... args) {
-            return detail::expected_storage<T, E>::emplace(
-                il, std::forward<Args>(args)...);
+        constexpr explicit expected(in_place_t, initializer_list<U> il,
+            Args&&... args) requires(std::is_constructible_v<T,
+            initializer_list<U>&, Args...>)
+            : _value(il, std::forward<Args>(args)...), _has_value(true) {}
+
+        template <typename... Args>
+        constexpr explicit expected(unexpect_t, Args&&... args) requires(
+            std::is_constructible_v<E, Args...>)
+            : _error(std::forward<Args>(args)...), _has_value(false) {}
+
+        template <typename U, typename... Args>
+        constexpr explicit expected(unexpect_t, initializer_list<U> il,
+            Args&&... args) requires(std::is_constructible_v<E,
+            initializer_list<U>&, Args...>)
+            : _error(il, std::forward<Args>(args)...), _has_value(false) {}
+
+        // Destructor
+
+        constexpr ~expected() {
+            if (_has_value) {
+                std::destroy_at(std::addressof(_value));
+            } else {
+                std::destroy_at(std::addressof(_error));
+            }
         }
 
-        // �.�.4.5 Observers [expected.object.observe]
-        constexpr const T* operator->() const {
-            return std::addressof(this->_value);
+#if KZ_P0848R3
+        constexpr ~expected() requires(std::is_trivially_destructible_v<T> &&
+                                       !std::is_trivially_destructible_v<E>) {
+            if (!_has_value) {
+                std::destroy_at(std::addressof(_error));
+            }
         }
 
-        template <typename U = T>
-        requires(!std::is_void_v<T> && std::is_same_v<T, U>) constexpr T*
-        operator->() {
-            return std::addressof(this->_value);
+        constexpr ~expected() requires(!std::is_trivially_destructible_v<T> &&
+                                       std::is_trivially_destructible_v<E>) {
+            if (_has_value) {
+                std::destroy_at(std::addressof(_value));
+            }
         }
 
-        template <typename U = T>
-        requires(!std::is_void_v<T> && std::is_same_v<T, U>) constexpr const U&
-        operator*() const& {
-            return this->_value;
+        constexpr ~expected() requires(std::is_trivially_destructible_v<T>&&
+                std::is_trivially_destructible_v<E>) = default;
+#endif
+
+        // Assignment
+
+        constexpr expected& operator=(const expected& rhs) requires(
+            std::is_copy_assignable_v<T>&& std::is_copy_constructible_v<T>&&
+                std::is_copy_assignable_v<E>&&
+                    std::is_copy_constructible_v<E> &&
+            (std::is_nothrow_move_constructible_v<T> ||
+                std::is_nothrow_move_constructible_v<E>)) {
+            if (_has_value) {
+                if (rhs._has_value) {
+                    _value = rhs._value;
+                } else {
+                    detail::reinit_expected(_error, _value, rhs._error);
+                    _has_value = false;
+                }
+            } else {
+                if (rhs._has_value) {
+                    detail::reinit_expected(_value, _error, rhs._value);
+                    _has_value = true;
+                } else {
+                    _error = rhs._error;
+                }
+            }
+            return *this;
         }
 
-        template <typename U = T>
-        requires(!std::is_void_v<T> && std::is_same_v<T, U>) constexpr U&
-        operator*() & {
-            return this->_value;
+        constexpr expected& operator=(const expected&) = delete;
+
+        constexpr expected& operator=(expected&& rhs) noexcept(
+            std::is_nothrow_move_assignable_v<
+                T>&& std::is_nothrow_move_constructible_v<T>&&
+                std::is_nothrow_move_assignable_v<E>&&
+                    std::is_nothrow_move_constructible_v<
+                        E>) requires(std::is_move_constructible_v<T>&&
+                                         std::is_move_assignable_v<T>&&
+                                             std::is_move_constructible_v<E>&&
+                                                 std::is_move_assignable_v<E> &&
+                                     (std::is_nothrow_move_constructible_v<T> ||
+                                         std::is_nothrow_move_constructible_v<
+                                             E>)) {
+            if (_has_value) {
+                if (rhs._has_value) {
+                    _value = std::move(rhs._value);
+                } else {
+                    detail::reinit_expected(
+                        _error, _value, std::move(rhs._error));
+                    _has_value = false;
+                }
+            } else {
+                if (rhs._has_value) {
+                    detail::reinit_expected(
+                        _value, _error, std::move(rhs._value));
+                    _has_value = true;
+                } else {
+                    _error = std::move(rhs._error);
+                }
+            }
+            return *this;
         }
 
-        template <typename U = T>
-        requires(!std::is_void_v<T> && std::is_same_v<T, U>) constexpr const U&&
-        operator*() const&& {
-            return std::move(this->_value);
+        constexpr expected& operator=(expected&&) = delete;
+
+        template <class U = T>
+        constexpr expected& operator=(U&& v) requires(
+            !std::is_same_v<expected, std::remove_cvref_t<U>> &&
+            !std::is_same_v<std::remove_cvref_t<U>, unexpected<E>> &&
+            std::is_constructible_v<T, U> && std::is_assignable_v<T&, U> &&
+            (std::is_nothrow_constructible_v<T, U> ||
+                std::is_nothrow_move_constructible_v<E>)) {
+            if (_has_value) {
+                _value = std::forward<U>(v);
+            } else {
+                detail::reinit_expected(_value, _error, std::forward<U>(v));
+                _has_value = true;
+            }
+            return *this;
         }
 
-        template <typename U = T>
-        requires(!std::is_void_v<T> && std::is_same_v<T, U>) constexpr U&&
-        operator*() && {
-            return std::move(this->_value);
+        template <class G>
+        constexpr expected& operator=(const unexpected<G>& e) requires(
+            std::is_constructible_v<E, const G&>&&
+                std::is_assignable_v<E&, const G&> &&
+            (std::is_nothrow_constructible_v<E, const G&> ||
+                std::is_nothrow_move_constructible_v<T>)) {
+            if (_has_value) {
+                detail::reinit_expected(
+                    _error, _value, std::forward<const G&>(e.value()));
+                _has_value = false;
+            } else {
+                _error = std::forward<const G&>(e.value());
+            }
+            return *this;
         }
 
-        constexpr explicit operator bool() const noexcept {
-            return this->_has_value;
+        template <class G>
+        constexpr expected& operator=(unexpected<G>&& e) requires(
+            std::is_constructible_v<E, G>&& std::is_assignable_v<E&, G> &&
+            (std::is_nothrow_constructible_v<E, G> ||
+                std::is_nothrow_move_constructible_v<T>)) {
+            if (_has_value) {
+                detail::reinit_expected(
+                    _error, _value, std::forward<G>(e.value()));
+                _has_value = false;
+            } else {
+                _error = std::forward<G>(e.value());
+            }
+            return *this;
         }
 
-        constexpr bool has_value() const noexcept { return this->_has_value; }
+        // Modifiers
 
-        template <typename U = T>
-        requires(!std::is_void_v<T> &&
-                 std::is_same_v<T, U>) constexpr const U& value() const& {
+        template <class... Args>
+        constexpr T& emplace(Args&&... args) noexcept
+            requires(std::is_nothrow_constructible_v<T, Args...>) {
+            if (_has_value)
+                std::destroy_at(std::addressof(_value));
+            else {
+                std::destroy_at(std::addressof(_error));
+            }
+            construct_value(std::forward<Args>(args)...);
+            return _value;
+        }
+
+        template <class U, class... Args>
+        constexpr T& emplace(initializer_list<U> il, Args&&... args) noexcept
+            requires(std::is_nothrow_constructible_v<T,
+                std::initializer_list<U>&, Args...>) {
+            if (_has_value)
+                std::destroy_at(std::addressof(_value));
+            else {
+                std::destroy_at(std::addressof(_error));
+            }
+            construct_value(il, std::forward<Args>(args)...);
+            return _value;
+        }
+
+        // Swap
+
+        constexpr void swap(expected& rhs) noexcept(
+            std::is_nothrow_move_constructible_v<
+                T>&& std::is_nothrow_swappable_v<T>&&
+                std::is_nothrow_move_constructible_v<E>&&
+                    std::is_nothrow_swappable_v<
+                        E>) requires(std::is_swappable_v<T>&&
+                                         std::is_swappable_v<E>&&
+                                             std::is_move_constructible_v<T>&&
+                                                 std::is_move_constructible_v<
+                                                     E> &&
+                                     (std::is_nothrow_move_constructible_v<T> ||
+                                         std::is_nothrow_move_constructible_v<
+                                             E>)) {
+            if (_has_value) {
+                if (rhs._has_value) {
+                    using std::swap;
+                    std::swap(_value, rhs._value);
+                } else {
+#if KZ_EXCEPTIONS
+                    if constexpr (std::is_nothrow_move_constructible_v<T> &&
+                                  std::is_nothrow_move_constructible_v<E>) {
+                        E tmp(std::move(rhs._error));
+                        std::destroy_at(std::addressof(rhs._error));
+                        std::construct_at(
+                            std::addressof(rhs._value), std::move(_value));
+                        std::destroy_at(std::addressof(_value));
+                        std::construct_at(
+                            std::addressof(_error), std::move(tmp));
+
+                    } else if constexpr (std::is_nothrow_move_constructible_v<
+                                             E>) {
+                        E tmp(std::move(rhs._error));
+                        std::destroy_at(std::addressof(rhs._error));
+                        try {
+                            std::construct_at(
+                                std::addressof(rhs._value), std::move(_value));
+                            std::destroy_at(std::addressof(_value));
+                            std::construct_at(
+                                std::addressof(_error), std::move(tmp));
+                        } catch (...) {
+                            std::construct_at(
+                                std::addressof(rhs._error), std::move(tmp));
+                            throw;
+                        }
+                    } else {
+                        T tmp(std::move(_value));
+                        std::destroy_at(std::addressof(_value));
+                        try {
+                            std::construct_at(
+                                std::addressof(_error), std::move(rhs._error));
+                            std::destroy_at(std::addressof(rhs._error));
+                            std::construct_at(
+                                std::addressof(rhs._value), std::move(tmp));
+                        } catch (...) {
+                            std::construct_at(
+                                std::addressof(_value), std::move(tmp));
+                            throw;
+                        }
+                    }
+                    _has_value = false;
+                    rhs._has_value = true;
+#else
+                    E tmp(std::move(rhs._error));
+                    std::destroy_at(std::addressof(rhs._error));
+                    rhs.construct_value(std::move(_value));
+                    std::destroy_at(std::addressof(_value));
+                    construct_error(std::move(tmp));
+#endif
+                }
+            } else {
+                if (rhs._has_value) {
+                    rhs.swap(*this);
+                } else {
+                    using std::swap;
+                    std::swap(_error, rhs._error);
+                }
+            }
+        }
+
+        friend constexpr void swap(expected& x, expected& y) noexcept(
+            noexcept(x.swap(y))) {
+            x.swap(y);
+        }
+
+        // Observers
+
+        constexpr const T* operator->() const noexcept {
+            return std::addressof(_value);
+        }
+
+        constexpr T* operator->() noexcept { return std::addressof(_value); }
+        constexpr const T& operator*() const& { return _value; }
+        constexpr T& operator*() & { return _value; }
+        constexpr const T&& operator*() const&& { return std::move(_value); }
+        constexpr T&& operator*() && { return std::move(_value); }
+        constexpr explicit operator bool() const noexcept { return _has_value; }
+        constexpr bool has_value() const noexcept { return _has_value; }
+
+        constexpr const T& value() const& {
 #if KZ_EXCEPTIONS
             if (!*this)
                 throw bad_expected_access(error());
 #endif
-            return this->_value;
+            return _value;
         }
 
-        template <typename U = T>
-        requires(
-            !std::is_void_v<T> && std::is_same_v<T, U>) constexpr U& value() & {
+        constexpr T& value() & {
 #if KZ_EXCEPTIONS
             if (!*this)
                 throw bad_expected_access(error());
 #endif
-            return this->_value;
+            return _value;
         }
 
-        template <typename U = T>
-        requires(!std::is_void_v<T> &&
-                 std::is_same_v<T, U>) constexpr const U&& value() const&& {
+        constexpr const T&& value() const&& {
 #if KZ_EXCEPTIONS
             if (!*this)
-                throw bad_expected_access(error());
+                throw bad_expected_access(std::move(error()));
 #endif
-            return std::move(this->_value);
+            return std::move(_value);
         }
 
-        template <typename U = T>
-        requires(!std::is_void_v<T> &&
-                 std::is_same_v<T, U>) constexpr U&& value() && {
+        constexpr T&& value() && {
 #if KZ_EXCEPTIONS
             if (!*this)
-                throw bad_expected_access(error());
+                throw bad_expected_access(std::move(error()));
 #endif
-            return std::move(this->_value);
+            return std::move(_value);
         }
 
-        constexpr const E& error() const& { return this->_error.value(); }
+        constexpr const E& error() const& { return _error; }
 
-        constexpr E& error() & { return this->_error.value(); }
+        constexpr E& error() & { return _error; }
 
-        constexpr const E&& error() const&& {
-            return std::move(this->_error.value());
-        }
+        constexpr const E&& error() const&& { return std::move(_error); }
 
-        constexpr E&& error() && { return std::move(this->_error.value()); }
+        constexpr E&& error() && { return std::move(_error); }
 
         template <typename U>
-        requires(std::is_copy_constructible_v<T>&&
-                std::is_convertible_v<U&&, T>) constexpr T
-            value_or(U&& value) const& {
-            return bool(*this) ? **this
-                               : static_cast<T>(std::forward<U>(value));
+        constexpr T value_or(U&& v) const& {
+            return has_value() ? **this : static_cast<T>(std::forward<U>(v));
         }
 
         template <typename U>
-        requires(std::is_move_constructible_v<T>&&
-                std::is_convertible_v<U&&, T>) constexpr T
-            value_or(U&& value) && {
-            return bool(*this) ? std::move(**this)
-                               : static_cast<T>(std::forward<U>(value));
+        constexpr T value_or(U&& v) && {
+            return has_value() ? std::move(**this)
+                               : static_cast<T>(std::forward<U>(v));
         }
 
-        // �.�.4.6 Expected Equality operators [expected.equality_op]
-        template <typename T1, typename E1, typename T2, typename E2>
-        friend constexpr bool operator==(
-            const expected<T1, E1>& x, const expected<T2, E2>& y);
-        template <typename T1, typename E1, typename T2, typename E2>
-        friend constexpr bool operator!=(
-            const expected<T1, E1>& x, const expected<T2, E2>& y);
+        // Equality operators
 
-        // �.�.4.7 Comparison with T [expected.comparison_T]
-        template <typename T1, typename E1, typename T2>
-        friend constexpr bool operator==(const expected<T1, E1>&, const T2&);
-        template <typename T1, typename E1, typename T2>
-        friend constexpr bool operator==(const T2&, const expected<T1, E1>&);
-        template <typename T1, typename E1, typename T2>
-        friend constexpr bool operator!=(const expected<T1, E1>&, const T2&);
-        template <typename T1, typename E1, typename T2>
-        friend constexpr bool operator!=(const T2&, const expected<T1, E1>&);
+        template <class T2, class E2>
+        requires(!std::is_void_v<T2>) friend constexpr bool operator==(
+            const expected& x, const expected<T2, E2>& y) {
+            if (x.has_value())
+                return y.has_value() && static_cast<bool>(*x == *y);
+            else
+                return !y.has_value() &&
+                       static_cast<bool>(x.error() == y.error());
+        }
 
-        // �.�.4.8 Comparison with unexpected<E>
-        // [expected.comparison_unexpected_E]
-        template <typename T1, typename E1, typename E2>
-        friend constexpr bool operator==(
-            const expected<T1, E1>&, const unexpected<E2>&);
-        template <typename T1, typename E1, typename E2>
-        friend constexpr bool operator==(
-            const unexpected<E2>&, const expected<T1, E1>&);
-        template <typename T1, typename E1, typename E2>
-        friend constexpr bool operator!=(
-            const expected<T1, E1>&, const unexpected<E2>&);
-        template <typename T1, typename E1, typename E2>
-        friend constexpr bool operator!=(
-            const unexpected<E2>&, const expected<T1, E1>&);
+        template <class T2>
+        friend constexpr bool operator==(const expected& x, const T2& v) {
+            return x.has_value() && static_cast<bool>(*x == v);
+        }
 
-        // �.�.4.9 Specialized algorithms [expected.specalg]
-        template <typename T1, typename E1>
-        friend void swap(expected<T1, E1>& x, expected<T1, E1>& y) noexcept(
-            noexcept(x.swap(y)));
+        template <class E2>
+        friend constexpr bool operator==(
+            const expected& x, const unexpected<E2>& e) {
+            return !x.has_value() && static_cast<bool>(x.error() == e.value());
+        }
+
+    private:
+        template <typename... Args>
+        constexpr void construct_value(Args&&... args) {
+            std::construct_at(
+                std::addressof(_value), std::forward<Args>(args)...);
+            _has_value = true;
+        }
+
+        template <typename... Args>
+        constexpr void construct_error(Args&&... args) {
+            std::construct_at(
+                std::addressof(_error), std::forward<Args>(args)...);
+            _has_value = false;
+        }
+
+        union {
+            T _value;
+            E _error;
+        };
+        bool _has_value;
     };
 
-    template <typename T1, typename E1, typename T2, typename E2>
-    constexpr bool operator==(
-        const expected<T1, E1>& x, const expected<T2, E2>& y) {
-        if (bool(x))
-            return bool(y) && *x == *y;
-        else
-            return !bool(y) && x.error() == y.error();
-    }
+    /*
+        Partial specialization for void types
+    */
 
-    template <typename E1, typename T2, typename E2>
-    constexpr bool operator==(
-        const expected<void, E1>& x, const expected<T2, E2>& y) {
-        if (bool(x))
-            return false;
-        else
-            return !bool(y) && x.error() == y.error();
-    }
+    template <typename T, typename E>
+    requires std::is_void_v<T>
+    class expected<T, E> {
+    public:
+        using value_type = T;
+        using error_type = E;
+        using unexpected_type = unexpected<E>;
 
-    template <typename T1, typename E1, typename E2>
-    constexpr bool operator==(
-        const expected<T1, E1>& x, const expected<void, E2>& y) {
-        return y == x;
-    }
+        template <typename U>
+        using rebind = expected<U, error_type>;
 
-    template <typename E1, typename E2>
-    constexpr bool operator==(
-        const expected<void, E1>& x, const expected<void, E2>& y) {
-        if (bool(x))
-            return bool(y);
-        else
+        // Constructors
 
-            return !bool(y) && x.error() == y.error();
-    }
+        constexpr expected() : _has_value(true) {}
 
-    template <typename T1, typename E1, typename T2, typename E2>
-    constexpr bool operator!=(
-        const expected<T1, E1>& x, const expected<T2, E2>& y) {
-        return !(x == y);
-    }
+#if KZ_P0848R3
+        constexpr expected(const expected& rhs) requires(
+            std::is_copy_constructible_v<E> &&
+            !std::is_trivially_copy_constructible_v<E>) {
+            if (rhs._has_value) {
+                construct_value();
+            } else {
+                construct_error(rhs._error);
+            }
+        }
 
-    template <typename T1, typename E1, typename T2>
-    constexpr bool operator==(const expected<T1, E1>& x, const T2& y) {
-        return bool(x) ? *x == y : false;
-    }
+        constexpr expected(const expected&) requires(
+            std::is_trivially_copy_constructible_v<E>) = default;
 
-    template <typename T1, typename E1, typename T2>
-    constexpr bool operator==(const T2& x, const expected<T1, E1>& y) {
-        return y == x;
-    }
+        constexpr expected(const expected&) requires(
+            !std::is_copy_constructible_v<T> &&
+            !std::is_copy_constructible_v<E>) = delete;
 
-    template <typename T1, typename E1, typename T2>
-    constexpr bool operator!=(const expected<T1, E1>& x, const T2& y) {
-        return !(x == y);
-    }
+#else
+        constexpr expected(const expected& rhs) requires(
+            std::is_copy_constructible_v<E>) {
+            if (rhs._has_value) {
+                construct_value();
+            } else {
+                construct_error(rhs._error);
+            }
+        }
+#endif
 
-    template <typename T1, typename E1, typename T2>
-    constexpr bool operator!=(const T2& x, const expected<T1, E1>& y) {
-        return !(x == y);
-    }
+#if KZ_P0848R3
+        constexpr expected(expected&& rhs) requires(
+            std::is_move_constructible_v<E> &&
+            !std::is_trivially_move_constructible_v<E>) {
+            if (rhs._has_value) {
+                construct_value();
+            } else {
+                construct_error(std::move(rhs._error));
+            }
+        }
 
-    template <typename T1, typename E1, typename E2>
-    constexpr bool operator==(
-        const expected<T1, E1>& x, const unexpected<E2>& y) {
-        return bool(x) ? false : unexpected(x.error()) == y;
-    }
+        constexpr expected(expected&&) requires(
+            std::is_trivially_move_constructible_v<E>) = default;
 
-    template <typename T1, typename E1, typename E2>
-    constexpr bool operator==(
-        const unexpected<E2>& x, const expected<T1, E1>& y) {
-        return y == x;
-    }
+#else
+        constexpr expected(expected&& rhs) requires(
+            std::is_move_constructible_v<E>) {
+            if (rhs._has_value) {
+                construct_value();
+            } else {
+                construct_error(std::move(rhs._error));
+            }
+        }
+#endif
 
-    template <typename T1, typename E1, typename E2>
-    constexpr bool operator!=(
-        const expected<T1, E1>& x, const unexpected<E2>& y) {
-        return !(x == y);
-    }
+        template <typename U, typename G>
+        constexpr explicit(!std::is_convertible_v<const G&, E>)
+            expected(const expected<U, G>& rhs) requires(
+                std::is_void_v<U>&& std::is_constructible_v<E, const G&> &&
+                !std::is_constructible_v<unexpected<E>, expected<U, G>&> &&
+                !std::is_constructible_v<unexpected<E>, expected<U, G>> &&
+                !std::is_constructible_v<unexpected<E>,
+                    const expected<U, G>&> &&
+                !std::is_constructible_v<unexpected<E>, const expected<U, G>>) {
+            if (bool(rhs)) {
+                construct_value();
+            } else {
+                construct_error(rhs.error());
+            }
+        }
 
-    template <typename T1, typename E1, typename E2>
-    constexpr bool operator!=(
-        const unexpected<E2>& x, const expected<T1, E1>& y) {
-        return !(x == y);
-    }
+        template <typename U, typename G>
+        constexpr explicit(
+            !std::is_convertible_v<U, T> || !std::is_convertible_v<G, E>)
+            expected(expected<U, G>&& rhs) requires(
+                std::is_void_v<U>&& std::is_constructible_v<E, G> &&
+                !std::is_constructible_v<unexpected<E>, expected<U, G>&> &&
+                !std::is_constructible_v<unexpected<E>, expected<U, G>> &&
+                !std::is_constructible_v<unexpected<E>,
+                    const expected<U, G>&> &&
+                !std::is_constructible_v<unexpected<E>, const expected<U, G>>) {
+            if (bool(rhs)) {
+                construct_value();
+            } else {
+                construct_error(std::move(rhs.error()));
+            }
+        }
 
-    template <typename T1, typename E1>
-    requires((std::is_void_v<std::remove_cvref_t<T1>> ||
-              std::is_move_constructible_v<T1>)&&std::is_swappable_v<T1>&&
-            std::is_move_constructible_v<E1>&&
-                std::is_swappable_v<E1>) void swap(expected<T1, E1>& x,
-        expected<T1, E1>& y) noexcept(noexcept(x.swap(y))) {
-        x.swap(y);
-    }
+        template <typename G>
+        constexpr explicit(!std::is_convertible_v<const G&, E>)
+            expected(const unexpected<G>& e) requires(
+                std::is_constructible_v<E, const G&>)
+            : _error(std::forward<const G&>(e.value())), _has_value(false) {}
+
+        template <typename G>
+        constexpr explicit(!std::is_convertible_v<G, E>)
+            expected(unexpected<G>&& e) requires(std::is_constructible_v<E, G>)
+            : _error(std::forward<G>(e.value())), _has_value(false) {}
+
+        constexpr explicit expected(in_place_t) : _has_value(true) {}
+
+        template <typename... Args>
+        constexpr explicit expected(unexpect_t, Args&&... args) requires(
+            std::is_constructible_v<E, Args...>)
+            : _error(std::forward<Args>(args)...), _has_value(false) {}
+
+        template <typename U, typename... Args>
+        constexpr explicit expected(unexpect_t, initializer_list<U> il,
+            Args&&... args) requires(std::is_constructible_v<E,
+            initializer_list<U>&, Args...>)
+            : _error(il, std::forward<Args>(args)...), _has_value(false) {}
+
+        // Destructor
+
+        constexpr ~expected() {
+            if (!_has_value) {
+                _error.~E();
+            }
+        }
+
+#if KZ_P0848R3
+        constexpr ~expected() requires(
+            std::is_trivially_destructible_v<E>) = default;
+#endif
+
+        // Assignment
+
+        constexpr expected& operator=(const expected& rhs) requires(
+            std::is_copy_assignable_v<E>&& std::is_copy_constructible_v<E>) {
+            if (_has_value) {
+                if (!rhs._has_value) {
+                    construct_error(rhs._error);
+                }
+            } else {
+                if (rhs._has_value) {
+                    std::destroy_at(std::addressof(_error));
+                    construct_value();
+                } else {
+                    _error = rhs._error;
+                }
+            }
+            return *this;
+        }
+
+        constexpr expected& operator=(const expected&) = delete;
+
+        constexpr expected& operator=(expected&& rhs) noexcept(
+            std::is_nothrow_move_assignable_v<E>&&
+                std::is_nothrow_move_constructible_v<E>) requires(std::
+                is_move_constructible_v<E>&& std::is_move_assignable_v<E>) {
+            if (_has_value) {
+                if (!rhs._has_value) {
+                    construct_error(std::move(rhs._error));
+                }
+            } else {
+                if (rhs._has_value) {
+                    std::destroy_at(std::addressof(_error));
+                    construct_value();
+                } else {
+                    _error = std::move(rhs._error);
+                }
+            }
+            return *this;
+        }
+
+        constexpr expected& operator=(expected&&) = delete;
+
+        template <class G>
+        constexpr expected& operator=(const unexpected<G>& e) requires(
+            std::is_constructible_v<E, const G&>&&
+                std::is_assignable_v<E&, const G&>) {
+            if (_has_value) {
+                construct_error(std::forward<const G&>(e.value()));
+            } else {
+                _error = std::forward<const G&>(e.value());
+            }
+            return *this;
+        }
+
+        template <class G>
+        constexpr expected& operator=(unexpected<G>&& e) requires(
+            std::is_constructible_v<E, G>&& std::is_assignable_v<E&, G>) {
+            if (_has_value) {
+                construct_error(std::forward<G>(e.value()));
+            } else {
+                _error = std::forward<G>(e.value());
+            }
+            return *this;
+        }
+
+        // Modifiers
+
+        constexpr void emplace() noexcept {
+            if (!_has_value) {
+                std::destroy_at(std::addressof(_error));
+                _has_value = true;
+            }
+        }
+
+        // Swap
+
+        constexpr void swap(expected& rhs) noexcept(
+            std::is_nothrow_move_constructible_v<E>&& std::
+                is_nothrow_swappable_v<E>) requires(std::is_swappable_v<E>&&
+                std::is_move_constructible_v<E>) {
+
+            if (_has_value) {
+                if (!rhs._has_value) {
+                    construct_error(std::move(rhs._error));
+                    std::destroy_at(std::addressof(rhs._error));
+                    rhs._has_value = true;
+                }
+            } else {
+                if (rhs._has_value) {
+                    rhs.swap(*this);
+                } else {
+                    using std::swap;
+                    swap(_error, rhs._error);
+                }
+            }
+        }
+
+        friend constexpr void swap(expected& x, expected& y) noexcept(
+            noexcept(x.swap(y))) {
+            x.swap(y);
+        }
+
+        // Observers
+
+        constexpr explicit operator bool() const noexcept { return _has_value; }
+
+        constexpr bool has_value() const noexcept { return _has_value; }
+        constexpr void operator*() const noexcept {}
+
+        constexpr void value() const& {
+#if KZ_EXCEPTIONS
+            if (!*this)
+                throw bad_expected_access(error());
+#endif
+        }
+
+        constexpr void value() && {
+#if KZ_EXCEPTIONS
+            if (!*this)
+                throw bad_expected_access(error());
+#endif
+        }
+
+        constexpr const E& error() const& { return _error; }
+        constexpr E& error() & { return _error; }
+        constexpr const E&& error() const&& { return std::move(_error); }
+        constexpr E&& error() && { return std::move(_error); }
+
+        // Equality operators
+
+        template <class T2, class E2>
+        requires(std::is_void_v<T2>) friend constexpr bool operator==(
+            const expected& x, const expected<T2, E2>& y) {
+            if (x.has_value())
+                return y.has_value();
+            else
+                return !y.has_value() &&
+                       static_cast<bool>(x.error() == y.error());
+        }
+
+        template <class E2>
+        friend constexpr bool operator==(
+            const expected& x, const unexpected<E2>& e) {
+            return !x.has_value() && static_cast<bool>(x.error() == e.value());
+        }
+
+    private:
+        constexpr void construct_value() { _has_value = true; }
+
+        template <typename... Args>
+        constexpr void construct_error(Args&&... args) {
+            std::construct_at(
+                std::addressof(_error), std::forward<Args>(args)...);
+            _has_value = false;
+        }
+
+        union {
+            E _error;
+        };
+        bool _has_value;
+    };
 
 } // namespace kz

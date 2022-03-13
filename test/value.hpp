@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2021, Thierry Tremblay
+    Copyright (c) 2022, Thierry Tremblay
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -53,6 +53,17 @@ struct NotCopyConstructible {
 };
 static_assert(!std::is_copy_constructible_v<NotCopyConstructible>);
 
+struct MoveAssignable {
+    MoveAssignable(int x) : value(x) {}
+    MoveAssignable& operator=(MoveAssignable&& rhs) {
+        value = rhs.value;
+        rhs.value = -1;
+        return *this;
+    }
+    int value;
+};
+static_assert(std::is_move_assignable_v<MoveAssignable>);
+
 struct MoveConstructible {
     MoveConstructible(int x) : value(x) {}
     MoveConstructible(MoveConstructible&& rhs) {
@@ -69,3 +80,16 @@ struct NotMoveConstructible {
     int value;
 };
 static_assert(!std::is_move_constructible_v<NotMoveConstructible>);
+
+struct ComplexThing {
+    ComplexThing(const CopyConstructible& a, MoveConstructible&& b)
+        : a(a), b(std::move(b)) {}
+
+    ComplexThing(std::vector<int> list, const CopyConstructible& a,
+        MoveConstructible&& b)
+        : list(list), a(a), b(std::move(b)) {}
+
+    std::vector<int> list;
+    CopyConstructible a;
+    MoveConstructible b;
+};
