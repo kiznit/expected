@@ -43,7 +43,7 @@ namespace std {
     // std::unexpected_.
     using kz::bad_expected_access;
     using kz::expected;
-    template <typename E>
+    template <class E>
     using unexpected_ = kz::unexpected<E>;
     using kz::unexpect;
 

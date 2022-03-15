@@ -36,33 +36,36 @@ namespace kz {
     using std::in_place_t;
     using std::initializer_list;
 
-    struct unexpect_t {};
-    inline constexpr unexpect_t unexpect;
+    struct unexpect_t{
+        explicit unexpect_t() = default;
+    };
 
-    template <typename E>
+    inline constexpr unexpect_t unexpect{};
+
+
+    template <class E>
     class unexpected {
     public:
         // Constructors
         constexpr unexpected(const unexpected&) = default;
-
         constexpr unexpected(unexpected&&) = default;
 
         template <class... Args>
-        constexpr explicit unexpected(in_place_t, Args&&... args) requires(
-            std::is_constructible_v<E, Args...>)
+        constexpr explicit unexpected(in_place_t, Args&&... args)
+        requires(std::is_constructible_v<E, Args...>)
             : _value(std::forward<Args>(args)...) {}
 
         template <class U, class... Args>
-        constexpr explicit unexpected(in_place_t, initializer_list<U> il,
-            Args&&... args) requires(std::is_constructible_v<E,
-            initializer_list<U>&, Args...>)
+        constexpr explicit unexpected(in_place_t, initializer_list<U> il, Args&&... args)
+        requires(std::is_constructible_v<E, initializer_list<U>&, Args...>)
             : _value(il, std::forward<Args>(args)...) {}
 
         template <class Err = E>
-        constexpr explicit unexpected(Err&& e) requires(
-            std::is_constructible_v<E, Err> &&
+        constexpr explicit unexpected(Err&& e)
+        requires(
             !std::is_same_v<std::remove_cvref_t<Err>, unexpected> &&
-            !std::is_same_v<std::remove_cvref_t<Err>, in_place_t>)
+            !std::is_same_v<std::remove_cvref_t<Err>, in_place_t> &&
+            std::is_constructible_v<E, Err>)
             : _value(std::forward<Err>(e)) {}
 
         // Assignment
@@ -70,37 +73,32 @@ namespace kz {
         constexpr unexpected& operator=(unexpected&&) = default;
 
         // Observers
-        constexpr const E& value() const& noexcept { return _value; }
-        constexpr E& value() & noexcept { return _value; }
-        constexpr const E&& value() const&& noexcept {
-            return std::move(_value);
-        }
-        constexpr E&& value() && noexcept { return std::move(_value); }
+        constexpr E&        value() &       noexcept { return _value; }
+        constexpr const E&  value() const&  noexcept { return _value; }
+        constexpr E&&       value() &&      noexcept { return std::move(_value); }
+        constexpr const E&& value() const&& noexcept { return std::move(_value); }
 
         // Swap
-        constexpr void swap(unexpected& other) noexcept(
-            std::is_nothrow_swappable_v<E>) {
+        constexpr void swap(unexpected& other) noexcept(std::is_nothrow_swappable_v<E>) {
             using std::swap;
             swap(_value, other._value);
+        }
+
+        friend void swap(unexpected<E>& x, unexpected<E>& y) noexcept(noexcept(x.swap(y)))
+        requires(std::is_swappable_v<E>) {
+            x.swap(y);
+        }
+
+        template <class E2>
+        friend constexpr bool operator==(const unexpected& x, const unexpected<E2>& y) {
+            return x.value() == y.value();
         }
 
     private:
         E _value;
     };
 
-    template <typename E>
-    void swap(unexpected<E>& x, unexpected<E>& y) noexcept(
-        noexcept(x.swap(y))) requires(std::is_swappable_v<E>) {
-        x.swap(y);
-    }
-
-    template <typename E1, typename E2>
-    constexpr bool operator==(
-        const unexpected<E1>& x, const unexpected<E2>& y) {
-        return x.value() == y.value();
-    }
-
-    template <typename E>
+    template <class E>
     unexpected(E) -> unexpected<E>;
 
 } // namespace kz

@@ -30,13 +30,13 @@
 #include <initializer_list>
 #include <vector>
 
-template <typename T>
+template <class T>
 struct Value {
     using value_type = T;
 
     Value(T x) noexcept : value(x) {}
     Value(std::initializer_list<T> list) noexcept : value(*list.begin()) {}
-    template <typename U>
+    template <class U>
     Value(const Value<U>& x) noexcept : value(x.value) {}
 
     ~Value() noexcept { value = 0; }
@@ -47,17 +47,17 @@ protected:
     Value() {}
 };
 
-template <typename T>
+template <class T>
 inline bool operator==(const Value<T>& x, const Value<T>& y) {
     return x.value == y;
 }
 
-template <typename T>
+template <class T>
 inline bool operator==(const Value<T>& x, T y) {
     return x.value == y;
 }
 
-template <typename T>
+template <class T>
 struct MoveableValue {
     using value_type = T;
 
@@ -70,7 +70,7 @@ struct MoveableValue {
 #endif
         x.value = T(0);
     }
-    template <typename U>
+    template <class U>
     MoveableValue(MoveableValue<U>&& x) : value(x.value) {
         x.value = T(0);
     }
@@ -90,19 +90,19 @@ struct MoveableValue {
     bool throwsOnMove{false};
 };
 
-template <typename T>
+template <class T>
 inline bool operator==(const MoveableValue<T>& x, T y) {
     return x.value == y;
 }
 
-template <typename T>
+template <class T>
 struct Default : Value<T> {
     constexpr static T DefaultValue = -100;
 
     Default() { this->value = DefaultValue; }
 };
 
-template <typename T>
+template <class T>
 inline bool operator==(const Default<T>& x, T y) {
     return x.value == y;
 }

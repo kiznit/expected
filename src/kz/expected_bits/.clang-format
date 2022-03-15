@@ -1,0 +1,3 @@
+# clang-format doesn't properly handle constraints, so we turn it off
+DisableFormat: true
+SortIncludes: false

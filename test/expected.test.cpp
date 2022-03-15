@@ -53,6 +53,16 @@ TEST_CASE("rebind<>", "[expected]") {
     static_assert(std::is_same_v<W::error_type, bool>);
 }
 
+TEST_CASE("is_specialization<>", "[expected]") {
+    using T1 = int;
+    using T2 = std::vector<int>;
+    using T3 = kz::unexpected<int>;
+
+    static_assert(!kz::detail::is_specialization<T1, kz::unexpected>::value);
+    static_assert(!kz::detail::is_specialization<T2, kz::unexpected>::value);
+    static_assert(kz::detail::is_specialization<T3, kz::unexpected>::value);
+}
+
 // TODO: how do we speciailize cv void? do we need to do anything?
 
 TEST_CASE("Default constructor", "[expected]") {
@@ -336,7 +346,7 @@ TEST_CASE("Construct using in_place_t") {
     // TODO: more tests
 }
 
-TEST_CASE("Constrcut using in_place_t and initializer_list") {
+TEST_CASE("Construct using in_place_t and initializer_list") {
     SECTION("no extra params") {
         using Type = std::expected<std::vector<int>, Error>;
         Type a(std::in_place, {1, 2, 3, 4});

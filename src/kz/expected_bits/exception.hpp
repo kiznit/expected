@@ -68,9 +68,9 @@ namespace kz {
     public:
         explicit bad_expected_access(E e) : _error(std::move(e)) {}
 
-        E& error() & noexcept { return _error; }
-        const E& error() const& noexcept { return _error; }
-        E&& error() && noexcept { return std::move(_error); }
+        E&        error() &       noexcept { return _error; }
+        const E&  error() const&  noexcept { return _error; }
+        E&&       error() &&      noexcept { return std::move(_error); }
         const E&& error() const&& noexcept { return std::move(_error); }
 
     private:
@@ -78,5 +78,12 @@ namespace kz {
     };
 
 } // namespace kz
+
+
+#define KZ_THROW(e) throw (e)
+
+#else
+
+#define KZ_THROW(e) {}
 
 #endif
