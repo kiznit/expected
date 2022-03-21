@@ -20,6 +20,11 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     #set(CXX_FLAGS_NO_EXCEPTIONS)
 endif()
 
+# Enable C++ concepts for older versions of GCC
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+set(CXX_FLAGS ${CXX_FLAGS} -fconcepts)
+endif()
+
 set(SRC
     catch2main.cpp
     expected.test.cpp

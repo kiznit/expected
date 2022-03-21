@@ -31,35 +31,54 @@
 #include <kz/expected_bits/exception.hpp>
 #include <kz/expected_bits/unexpected.hpp>
 
-// clang does not suport P0848R3. Details at
-// https://clang.llvm.org/cxx_status.html#cxx20.
-#if defined(__clang__)
+// clang does not suport P0848R3. Details at https://clang.llvm.org/cxx_status.html#cxx20.
+// Older versions of GCC / mingw will crash (ICE).
+#if defined(__clang__) || (defined(__GNUC__) && __GNUC__ < 10)
 #define KZ_P0848R3 0
 #else
 #define KZ_P0848R3 1
 #endif
 
+// Older versions of GCC / mingw won't allow constexpr on destructors
+#if !defined(__clang__) && (defined(__GNUC__) &&  __GNUC__ < 10)
+#define KZ_CONSTEXPR_DESTRUCTOR
+#else
+#define KZ_CONSTEXPR_DESTRUCTOR constexpr
+#endif
+
 namespace kz {
     namespace detail {
+
+    // Older versions of GCC / mingw missing std::construct_at
+    #if !defined(__clang__) && (defined(__GNUC__) &&  __GNUC__ < 10)
+        template<class T, class... Args>
+        constexpr T* construct_at(T* p, Args&&... args) {
+            return ::new (const_cast<void*>(static_cast<const volatile void*>(p))) T(std::forward<Args>(args)...);
+        }
+    #else
+        using std::construct_at;
+    #endif
+
+    using std::destroy_at;
 
 #if KZ_EXCEPTIONS
 
         template <class T, class U, class... Args>
         constexpr void reinit_expected(T& newval, U& oldval, Args&&... args) {
             if constexpr (std::is_nothrow_constructible_v<T, Args...>) {
-                std::destroy_at(std::addressof(oldval));
-                std::construct_at(std::addressof(newval), std::forward<Args>(args)...);
+                detail::destroy_at(std::addressof(oldval));
+                detail::construct_at(std::addressof(newval), std::forward<Args>(args)...);
             } else if constexpr (std::is_nothrow_move_constructible_v<T>) {
                 T tmp(std::forward<Args>(args)...);
-                std::destroy_at(std::addressof(oldval));
-                std::construct_at(std::addressof(newval), std::move(tmp));
+                detail::destroy_at(std::addressof(oldval));
+                detail::construct_at(std::addressof(newval), std::move(tmp));
             } else {
                 U tmp(std::move(oldval));
-                std::destroy_at(std::addressof(oldval));
+                detail::destroy_at(std::addressof(oldval));
                 try {
-                    std::construct_at(std::addressof(newval), std::forward<Args>(args)...);
+                    detail::construct_at(std::addressof(newval), std::forward<Args>(args)...);
                 } catch (...) {
-                    std::construct_at(std::addressof(oldval), std::move(tmp));
+                    detail::construct_at(std::addressof(oldval), std::move(tmp));
                     throw;
                 }
             }
@@ -69,8 +88,8 @@ namespace kz {
 
         template <class T, class U, class... Args>
         constexpr void reinit_expected(T& newval, U& oldval, Args&&... args) {
-            std::destroy_at(std::addressof(oldval));
-            std::construct_at(std::addressof(newval), std::forward<Args>(args)...);
+            detail::destroy_at(std::addressof(oldval));
+            detail::construct_at(std::addressof(newval), std::forward<Args>(args)...);
         }
 
 #endif
@@ -265,31 +284,31 @@ namespace kz {
             : _error(il, std::forward<Args>(args)...), _has_value(false) {}
 
         // Destructor
-        constexpr ~expected() {
+        KZ_CONSTEXPR_DESTRUCTOR ~expected() {
             if (_has_value) {
-                std::destroy_at(std::addressof(_value));
+                detail::destroy_at(std::addressof(_value));
             } else {
-                std::destroy_at(std::addressof(_error));
+                detail::destroy_at(std::addressof(_error));
             }
         }
 
 #if KZ_P0848R3
-        constexpr ~expected() requires(std::is_trivially_destructible_v<T> &&
-                                       !std::is_trivially_destructible_v<E>) {
+        KZ_CONSTEXPR_DESTRUCTOR ~expected() requires(std::is_trivially_destructible_v<T> &&
+                                                     !std::is_trivially_destructible_v<E>) {
             if (!_has_value) {
-                std::destroy_at(std::addressof(_error));
+                detail::destroy_at(std::addressof(_error));
             }
         }
 
-        constexpr ~expected() requires(!std::is_trivially_destructible_v<T> &&
-                                       std::is_trivially_destructible_v<E>) {
+        KZ_CONSTEXPR_DESTRUCTOR ~expected() requires(!std::is_trivially_destructible_v<T> &&
+                                                     std::is_trivially_destructible_v<E>) {
             if (_has_value) {
-                std::destroy_at(std::addressof(_value));
+                detail::destroy_at(std::addressof(_value));
             }
         }
 
-        constexpr ~expected() requires(std::is_trivially_destructible_v<T> &&
-                                       std::is_trivially_destructible_v<E>) = default;
+        KZ_CONSTEXPR_DESTRUCTOR ~expected() requires(std::is_trivially_destructible_v<T> &&
+                                                     std::is_trivially_destructible_v<E>) = default;
 #endif
 
         // Assignment
@@ -407,9 +426,9 @@ namespace kz {
         constexpr T& emplace(Args&&... args) noexcept
         requires(std::is_nothrow_constructible_v<T, Args...>) {
             if (_has_value)
-                std::destroy_at(std::addressof(_value));
+                detail::destroy_at(std::addressof(_value));
             else {
-                std::destroy_at(std::addressof(_error));
+                detail::destroy_at(std::addressof(_error));
             }
             construct_value(std::forward<Args>(args)...);
             return _value;
@@ -419,9 +438,9 @@ namespace kz {
         constexpr T& emplace(initializer_list<U> il, Args&&... args) noexcept
         requires(std::is_nothrow_constructible_v<T, std::initializer_list<U>&, Args...>) {
             if (_has_value)
-                std::destroy_at(std::addressof(_value));
+                detail::destroy_at(std::addressof(_value));
             else {
-                std::destroy_at(std::addressof(_error));
+                detail::destroy_at(std::addressof(_error));
             }
             construct_value(il, std::forward<Args>(args)...);
             return _value;
@@ -448,31 +467,31 @@ namespace kz {
                     if constexpr (std::is_nothrow_move_constructible_v<T> &&
                                   std::is_nothrow_move_constructible_v<E>) {
                         E tmp(std::move(rhs._error));
-                        std::destroy_at(std::addressof(rhs._error));
-                        std::construct_at(std::addressof(rhs._value), std::move(_value));
-                        std::destroy_at(std::addressof(_value));
-                        std::construct_at(std::addressof(_error), std::move(tmp));
+                        detail::destroy_at(std::addressof(rhs._error));
+                        detail::construct_at(std::addressof(rhs._value), std::move(_value));
+                        detail::destroy_at(std::addressof(_value));
+                        detail::construct_at(std::addressof(_error), std::move(tmp));
 
                     } else if constexpr (std::is_nothrow_move_constructible_v<E>) {
                         E tmp(std::move(rhs._error));
-                        std::destroy_at(std::addressof(rhs._error));
+                        detail::destroy_at(std::addressof(rhs._error));
                         try {
-                            std::construct_at(std::addressof(rhs._value), std::move(_value));
-                            std::destroy_at(std::addressof(_value));
-                            std::construct_at(std::addressof(_error), std::move(tmp));
+                            detail::construct_at(std::addressof(rhs._value), std::move(_value));
+                            detail::destroy_at(std::addressof(_value));
+                            detail::construct_at(std::addressof(_error), std::move(tmp));
                         } catch (...) {
-                            std::construct_at(std::addressof(rhs._error), std::move(tmp));
+                            detail::construct_at(std::addressof(rhs._error), std::move(tmp));
                             throw;
                         }
                     } else {
                         T tmp(std::move(_value));
-                        std::destroy_at(std::addressof(_value));
+                        detail::destroy_at(std::addressof(_value));
                         try {
-                            std::construct_at(std::addressof(_error), std::move(rhs._error));
-                            std::destroy_at(std::addressof(rhs._error));
-                            std::construct_at(std::addressof(rhs._value), std::move(tmp));
+                            detail::construct_at(std::addressof(_error), std::move(rhs._error));
+                            detail::destroy_at(std::addressof(rhs._error));
+                            detail::construct_at(std::addressof(rhs._value), std::move(tmp));
                         } catch (...) {
-                            std::construct_at(std::addressof(_value), std::move(tmp));
+                            detail::construct_at(std::addressof(_value), std::move(tmp));
                             throw;
                         }
                     }
@@ -480,9 +499,9 @@ namespace kz {
                     rhs._has_value = true;
 #else
                     E tmp(std::move(rhs._error));
-                    std::destroy_at(std::addressof(rhs._error));
+                    detail::destroy_at(std::addressof(rhs._error));
                     rhs.construct_value(std::move(_value));
-                    std::destroy_at(std::addressof(_value));
+                    detail::destroy_at(std::addressof(_value));
                     construct_error(std::move(tmp));
 #endif
                 }
@@ -568,16 +587,34 @@ namespace kz {
             return !x.has_value() && static_cast<bool>(x.error() == e.value());
         }
 
+#if defined(__GNUC__) && __GNUC__ < 10 && !defined(__clang__)
+        template <class T2, class E2>
+        requires(!std::is_void_v<T2>)
+        friend constexpr bool operator!=(const expected& x, const expected<T2, E2>& y) {
+            return !(x == y);
+        }
+
+        template <class T2>
+        friend constexpr bool operator!=(const expected& x, const T2& v) {
+            return !(x == v);
+        }
+
+        template <class E2>
+        friend constexpr bool operator!=(const expected& x, const unexpected<E2>& e) {
+            return !(x == e);
+        }
+#endif
+
     private:
         template <class... Args>
         constexpr void construct_value(Args&&... args) {
-            std::construct_at(std::addressof(_value), std::forward<Args>(args)...);
+            detail::construct_at(std::addressof(_value), std::forward<Args>(args)...);
             _has_value = true;
         }
 
         template <class... Args>
         constexpr void construct_error(Args&&... args) {
-            std::construct_at(std::addressof(_error), std::forward<Args>(args)...);
+            detail::construct_at(std::addressof(_error), std::forward<Args>(args)...);
             _has_value = false;
         }
 
@@ -720,14 +757,14 @@ namespace kz {
             : _error(il, std::forward<Args>(args)...), _has_value(false) {}
 
         // Destructor
-        constexpr ~expected() {
+        KZ_CONSTEXPR_DESTRUCTOR ~expected() {
             if (!_has_value) {
                 _error.~E();
             }
         }
 
 #if KZ_P0848R3
-        constexpr ~expected()
+        KZ_CONSTEXPR_DESTRUCTOR ~expected()
         requires(std::is_trivially_destructible_v<E>) = default;
 #endif
 
@@ -744,7 +781,7 @@ namespace kz {
                 }
             } else {
                 if (rhs._has_value) {
-                    std::destroy_at(std::addressof(_error));
+                    detail::destroy_at(std::addressof(_error));
                     construct_value();
                 } else {
                     _error = rhs._error;
@@ -767,7 +804,7 @@ namespace kz {
                 }
             } else {
                 if (rhs._has_value) {
-                    std::destroy_at(std::addressof(_error));
+                    detail::destroy_at(std::addressof(_error));
                     construct_value();
                 } else {
                     _error = std::move(rhs._error);
@@ -805,7 +842,7 @@ namespace kz {
         // Modifiers
         constexpr void emplace() noexcept {
             if (!_has_value) {
-                std::destroy_at(std::addressof(_error));
+                detail::destroy_at(std::addressof(_error));
                 _has_value = true;
             }
         }
@@ -820,7 +857,7 @@ namespace kz {
             if (_has_value) {
                 if (!rhs._has_value) {
                     construct_error(std::move(rhs._error));
-                    std::destroy_at(std::addressof(rhs._error));
+                    detail::destroy_at(std::addressof(rhs._error));
                     rhs._has_value = true;
                 }
             } else {
@@ -871,6 +908,19 @@ namespace kz {
             return !x.has_value() && static_cast<bool>(x.error() == e.value());
         }
 
+#if defined(__GNUC__) && __GNUC__ < 10 && !defined(__clang__)
+        template <class T2, class E2>
+        requires(std::is_void_v<T2>)
+        friend constexpr bool operator!=(const expected& x, const expected<T2, E2>& y) {
+            return !(x == y);
+        }
+
+        template <class E2>
+        friend constexpr bool operator!=(const expected& x, const unexpected<E2>& e) {
+            return !(x == e);
+        }
+#endif
+
     private:
         constexpr void construct_value() {
             _has_value = true;
@@ -878,7 +928,7 @@ namespace kz {
 
         template <class... Args>
         constexpr void construct_error(Args&&... args) {
-            std::construct_at(
+            detail::construct_at(
                 std::addressof(_error), std::forward<Args>(args)...);
             _has_value = false;
         }

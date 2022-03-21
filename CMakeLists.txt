@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.22)
 project(std_expected
     HOMEPAGE_URL https://github.com/kiznit/expected
     DESCRIPTION "C++ implementation of std::expected as proposed in P0323R12"
-    VERSION 0.12.0
+    VERSION 0.12.1
     LANGUAGES CXX)
 
 option(expected_BUILD_TESTS "Build tests" ON)

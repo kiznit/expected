@@ -94,6 +94,13 @@ namespace kz {
             return x.value() == y.value();
         }
 
+#if defined(__GNUC__) && __GNUC__ < 10 && !defined(__clang__)
+        template <class E2>
+        friend constexpr bool operator!=(const unexpected& x, const unexpected<E2>& y) {
+            return !(x == y);
+        }
+#endif
+
     private:
         E _value;
     };

@@ -15,16 +15,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          #- { os: 'ubuntu-latest',  compiler: 'clang', version: 10 }
+          - { os: 'ubuntu-latest',  compiler: 'clang', version: 10 }
           - { os: 'ubuntu-latest',  compiler: 'clang', version: 11 }
           - { os: 'ubuntu-latest',  compiler: 'clang', version: 12 }
           - { os: 'ubuntu-latest',  compiler: 'clang', version: 13 }
 
-          #- { os: 'ubuntu-latest',  compiler: 'gcc',   version: 9 }
+          - { os: 'ubuntu-latest',  compiler: 'gcc',   version: 9 }
           - { os: 'ubuntu-latest',  compiler: 'gcc',   version: 10 }
           - { os: 'ubuntu-latest',  compiler: 'gcc',   version: 11 }
 
-          #- { os: 'windows-latest', compiler: 'mingw', version: '9.4.0', config: "-G 'MinGW Makefiles'" }
+          - { os: 'windows-latest', compiler: 'mingw', version: '9.4.0',  config: "-G 'MinGW Makefiles'" }
           - { os: 'windows-latest', compiler: 'mingw', version: '10.3.0', config: "-G 'MinGW Makefiles'" }
           - { os: 'windows-latest', compiler: 'mingw', version: '11.2.0', config: "-G 'MinGW Makefiles'" }
 
