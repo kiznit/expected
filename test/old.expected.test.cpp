@@ -34,16 +34,16 @@ enum class Error { FileNotFound, IOError, FlyingSquirrels };
 TEST_CASE("expected constructors", "[expected]") {
 
     SECTION("default") {
-        kz::expected<DefaultInt, Error> a;
+        std::expected<DefaultInt, Error> a;
         REQUIRE(a.has_value());
         REQUIRE(*a == DefaultInt::DefaultValue);
 
-        kz::expected<void, Error> b;
+        std::expected<void, Error> b;
         REQUIRE(b.has_value());
     }
 
     SECTION("from value") {
-        kz::expected<IntValue, Error> a{123};
+        std::expected<IntValue, Error> a{123};
         REQUIRE(a.has_value());
         REQUIRE(*a == 123);
     }
@@ -51,7 +51,7 @@ TEST_CASE("expected constructors", "[expected]") {
     SECTION("from complex value") {
         const IntValue a{100};
         IntMoveableValue b{200};
-        kz::expected<ComplexThing, Error> c{std::in_place, a, std::move(b)};
+        std::expected<ComplexThing, Error> c{std::in_place, a, std::move(b)};
         REQUIRE(c->a == 100);
         REQUIRE(c->b == 200);
         REQUIRE(a == 100);
@@ -59,22 +59,22 @@ TEST_CASE("expected constructors", "[expected]") {
     }
 
     SECTION("from error") {
-        kz::unexpected error{Error::IOError};
-        kz::expected<IntValue, Error> a{error};
+        std::unexpected error{Error::IOError};
+        std::expected<IntValue, Error> a{error};
         REQUIRE(!a.has_value());
         REQUIRE(a.error() == Error::IOError);
 
-        kz::unexpected error2{Error::FlyingSquirrels};
-        kz::expected<void, Error> b{error2};
+        std::unexpected error2{Error::FlyingSquirrels};
+        std::expected<void, Error> b{error2};
         REQUIRE(!b.has_value());
         REQUIRE(b.error() == Error::FlyingSquirrels);
     }
 
     SECTION("from complex error") {
 
-        kz::unexpected<ComplexThing> error{
+        std::unexpected<ComplexThing> error{
             ComplexThing{IntValue{100}, IntMoveableValue{200}}};
-        kz::expected<int, ComplexThing> c{std::move(error)};
+        std::expected<int, ComplexThing> c{std::move(error)};
         REQUIRE(c.error().a == 100);
         REQUIRE(c.error().b == 200);
         REQUIRE(error.value().a == 100);
@@ -82,14 +82,14 @@ TEST_CASE("expected constructors", "[expected]") {
     }
 
     SECTION("in-place with value") {
-        kz::expected<IntValue, Error> a{std::in_place, 123};
+        std::expected<IntValue, Error> a{std::in_place, 123};
         REQUIRE(*a == 123);
     }
 
     SECTION("in-place with multiple parameters") {
         const IntValue a{100};
         IntMoveableValue b{200};
-        kz::expected<ComplexThing, Error> c{std::in_place, a, std::move(b)};
+        std::expected<ComplexThing, Error> c{std::in_place, a, std::move(b)};
         REQUIRE(c->a == 100);
         REQUIRE(c->b == 200);
         REQUIRE(a == 100);
@@ -97,14 +97,14 @@ TEST_CASE("expected constructors", "[expected]") {
     }
 
     SECTION("in-place with initializer list") {
-        kz::expected<std::vector<int>, Error> a{std::in_place, {1, 2, 3}};
+        std::expected<std::vector<int>, Error> a{std::in_place, {1, 2, 3}};
         REQUIRE(a->size() == 3);
     }
 
     SECTION("in-place with initializer list and extra parameters") {
         const IntValue a(100);
         IntMoveableValue b(200);
-        kz::expected<ComplexThing, Error> c{
+        std::expected<ComplexThing, Error> c{
             std::in_place, {1, 2, 3}, a, std::move(b)};
         REQUIRE(c->a == 100);
         REQUIRE(c->b == 200);
@@ -114,21 +114,21 @@ TEST_CASE("expected constructors", "[expected]") {
     }
 
     SECTION("unexpect_t with value") {
-        kz::expected<int, IntValue> a{kz::unexpect, 123};
+        std::expected<int, IntValue> a{std::unexpect, 123};
 
         REQUIRE(!a.has_value());
         REQUIRE(a.error() == 123);
     }
 
     SECTION("unexpect_t with initializer list") {
-        kz::expected<int, std::vector<int>> a{kz::unexpect, {1, 2, 3}};
+        std::expected<int, std::vector<int>> a{std::unexpect, {1, 2, 3}};
         REQUIRE(a.error().size() == 3);
     }
 
     SECTION("unexpect_t with multiple parameters") {
         const IntValue a{100};
         IntMoveableValue b{200};
-        kz::expected<int, ComplexThing> c{kz::unexpect, a, std::move(b)};
+        std::expected<int, ComplexThing> c{std::unexpect, a, std::move(b)};
         REQUIRE(c.error().a == 100);
         REQUIRE(c.error().b == 200);
         REQUIRE(a == 100);
@@ -138,8 +138,8 @@ TEST_CASE("expected constructors", "[expected]") {
     SECTION("unexpect_t with initializer list and extra parameters") {
         const IntValue a(100);
         IntMoveableValue b(200);
-        kz::expected<int, ComplexThing> c{
-            kz::unexpect, {1, 2, 3}, a, std::move(b)};
+        std::expected<int, ComplexThing> c{
+            std::unexpect, {1, 2, 3}, a, std::move(b)};
         REQUIRE(c.error().a == 100);
         REQUIRE(c.error().b == 200);
         REQUIRE(c.error().list.size() == 3);
@@ -148,30 +148,30 @@ TEST_CASE("expected constructors", "[expected]") {
     }
 
     SECTION("copy - value") {
-        const kz::expected<IntValue, Error> a{3};
-        kz::expected<IntValue, Error> b{a};
+        const std::expected<IntValue, Error> a{3};
+        std::expected<IntValue, Error> b{a};
         REQUIRE(a.has_value());
         REQUIRE(b.has_value());
         REQUIRE(*a == 3);
         REQUIRE(*b == 3);
 
-        const kz::expected<void, Error> c;
-        kz::expected<void, Error> d{c};
+        const std::expected<void, Error> c;
+        std::expected<void, Error> d{c};
         REQUIRE(c.has_value());
         REQUIRE(d.has_value());
     }
 
     SECTION("copy - error") {
-        const kz::expected<IntValue, Error> a{
-            kz::unexpected(Error::FileNotFound)};
-        kz::expected<IntValue, Error> b{a};
+        const std::expected<IntValue, Error> a{
+            std::unexpected(Error::FileNotFound)};
+        std::expected<IntValue, Error> b{a};
         REQUIRE(!a.has_value());
         REQUIRE(!b.has_value());
         REQUIRE(a.error() == Error::FileNotFound);
         REQUIRE(b.error() == Error::FileNotFound);
 
-        const kz::expected<void, Error> c{kz::unexpected(Error::IOError)};
-        kz::expected<void, Error> d{c};
+        const std::expected<void, Error> c{std::unexpected(Error::IOError)};
+        std::expected<void, Error> d{c};
         REQUIRE(!c.has_value());
         REQUIRE(!d.has_value());
         REQUIRE(c.error() == Error::IOError);
@@ -179,31 +179,31 @@ TEST_CASE("expected constructors", "[expected]") {
     }
 
     SECTION("move - value") {
-        kz::expected<IntMoveableValue, Error> a{4};
-        const kz::expected<IntMoveableValue, Error> b{std::move(a)};
+        std::expected<IntMoveableValue, Error> a{4};
+        const std::expected<IntMoveableValue, Error> b{std::move(a)};
         REQUIRE(a.has_value());
         REQUIRE(b.has_value());
         REQUIRE(*a == 0);
         REQUIRE(*b == 4);
 
-        kz::expected<void, Error> c;
-        const kz::expected<void, Error> d{std::move(c)};
+        std::expected<void, Error> c;
+        const std::expected<void, Error> d{std::move(c)};
         REQUIRE(c.has_value());
         REQUIRE(d.has_value());
     }
 
     SECTION("move - error") {
-        kz::expected<IntValue, IntMoveableValue> a{
-            kz::unexpected<IntMoveableValue>{55}};
-        const kz::expected<IntValue, IntMoveableValue> b{std::move(a)};
+        std::expected<IntValue, IntMoveableValue> a{
+            std::unexpected<IntMoveableValue>{55}};
+        const std::expected<IntValue, IntMoveableValue> b{std::move(a)};
         REQUIRE(!a.has_value());
         REQUIRE(!b.has_value());
         REQUIRE(a.error() == 0);
         REQUIRE(b.error() == 55);
 
-        kz::expected<void, IntMoveableValue> c{
-            kz::unexpected<IntMoveableValue>{66}};
-        const kz::expected<void, IntMoveableValue> d{std::move(c)};
+        std::expected<void, IntMoveableValue> c{
+            std::unexpected<IntMoveableValue>{66}};
+        const std::expected<void, IntMoveableValue> d{std::move(c)};
         REQUIRE(!c.has_value());
         REQUIRE(!d.has_value());
         REQUIRE(c.error() == 0);
@@ -211,29 +211,29 @@ TEST_CASE("expected constructors", "[expected]") {
     }
 
     SECTION("copy with conversion - value") {
-        const kz::expected<IntValue, Error> a{123};
-        kz::expected<LongValue, Error> b{a};
+        const std::expected<IntValue, Error> a{123};
+        std::expected<LongValue, Error> b{a};
         REQUIRE(a.has_value());
         REQUIRE(b.has_value());
         REQUIRE(*a == 123);
         REQUIRE(*b == 123l);
 
-        const kz::expected<void, Error> c;
-        kz::expected<void, Error> d{c};
+        const std::expected<void, Error> c;
+        std::expected<void, Error> d{c};
         REQUIRE(c.has_value());
         REQUIRE(d.has_value());
     }
 
     SECTION("copy with conversion - error") {
-        const kz::expected<IntValue, IntValue> a{kz::unexpected(456)};
-        kz::expected<LongValue, LongValue> b{a};
+        const std::expected<IntValue, IntValue> a{std::unexpected(456)};
+        std::expected<LongValue, LongValue> b{a};
         REQUIRE(!a.has_value());
         REQUIRE(!b.has_value());
         REQUIRE(a.error() == 456);
         REQUIRE(b.error() == 456l);
 
-        const kz::expected<void, IntValue> c{kz::unexpected(789)};
-        kz::expected<void, LongValue> d{c};
+        const std::expected<void, IntValue> c{std::unexpected(789)};
+        std::expected<void, LongValue> d{c};
         REQUIRE(!c.has_value());
         REQUIRE(!d.has_value());
         REQUIRE(c.error() == 789);
@@ -241,29 +241,30 @@ TEST_CASE("expected constructors", "[expected]") {
     }
 
     SECTION("move with conversion - value") {
-        kz::expected<IntMoveableValue, IntMoveableValue> a{69};
-        kz::expected<LongMoveableValue, LongMoveableValue> b{std::move(a)};
+        std::expected<IntMoveableValue, IntMoveableValue> a{69};
+        std::expected<LongMoveableValue, LongMoveableValue> b{std::move(a)};
         REQUIRE(a.has_value());
         REQUIRE(b.has_value());
         REQUIRE(*a == 0);
         REQUIRE(*b == 69l);
 
-        kz::expected<void, IntMoveableValue> c;
-        kz::expected<void, LongMoveableValue> d{std::move(c)};
+        std::expected<void, IntMoveableValue> c;
+        std::expected<void, LongMoveableValue> d{std::move(c)};
         REQUIRE(c.has_value());
         REQUIRE(d.has_value());
     }
 
     SECTION("move with conversion - error") {
-        kz::expected<IntMoveableValue, IntMoveableValue> a{kz::unexpected(456)};
-        kz::expected<LongMoveableValue, LongMoveableValue> b{std::move(a)};
+        std::expected<IntMoveableValue, IntMoveableValue> a{
+            std::unexpected(456)};
+        std::expected<LongMoveableValue, LongMoveableValue> b{std::move(a)};
         REQUIRE(!a.has_value());
         REQUIRE(!b.has_value());
         REQUIRE(a.error() == 0);
         REQUIRE(b.error() == 456l);
 
-        kz::expected<void, IntMoveableValue> c{kz::unexpected(789)};
-        kz::expected<void, LongMoveableValue> d{std::move(c)};
+        std::expected<void, IntMoveableValue> c{std::unexpected(789)};
+        std::expected<void, LongMoveableValue> d{std::move(c)};
         REQUIRE(!c.has_value());
         REQUIRE(!d.has_value());
         REQUIRE(c.error() == 0);
@@ -274,8 +275,8 @@ TEST_CASE("expected constructors", "[expected]") {
 TEST_CASE("expected assignments", "[expected]") {
 
     SECTION("assign value to value") {
-        const kz::expected<IntValue, Error> a{111};
-        kz::expected<IntValue, Error> b{222};
+        const std::expected<IntValue, Error> a{111};
+        std::expected<IntValue, Error> b{222};
 
         b = a;
 
@@ -286,9 +287,9 @@ TEST_CASE("expected assignments", "[expected]") {
     }
 
     SECTION("assign error to error") {
-        const kz::expected<IntValue, Error> a{
-            kz::unexpected(Error::FileNotFound)};
-        kz::expected<IntValue, Error> b{kz::unexpected(Error::IOError)};
+        const std::expected<IntValue, Error> a{
+            std::unexpected(Error::FileNotFound)};
+        std::expected<IntValue, Error> b{std::unexpected(Error::IOError)};
 
         b = a;
 
@@ -299,11 +300,11 @@ TEST_CASE("expected assignments", "[expected]") {
     }
 
     SECTION("assign value to error - is_nothrow_constructible_v<>") {
-        using type = kz::expected<int, Error>;
+        using type = std::expected<int, Error>;
         static_assert(std::is_nothrow_constructible_v<type::value_type>);
 
         const type a{111};
-        type b{kz::unexpected(Error::FlyingSquirrels)};
+        type b{std::unexpected(Error::FlyingSquirrels)};
 
         b = a;
 
@@ -314,13 +315,13 @@ TEST_CASE("expected assignments", "[expected]") {
     }
 
     SECTION("assign value to error - is_nothrow_move_constructible_v<>") {
-        using type = kz::expected<NotNoThrowConstructible, Error>;
+        using type = std::expected<NotNoThrowConstructible, Error>;
 
         static_assert(!std::is_nothrow_constructible_v<type::value_type>);
         static_assert(std::is_nothrow_move_constructible_v<type::value_type>);
 
         const type a(std::in_place, 444);
-        type b{kz::unexpected(Error::FlyingSquirrels)};
+        type b{std::unexpected(Error::FlyingSquirrels)};
 
         b = a;
 
@@ -331,13 +332,13 @@ TEST_CASE("expected assignments", "[expected]") {
     }
 
     SECTION("assign value to error - neither") {
-        using type = kz::expected<AssignableComplexThing, Error>;
+        using type = std::expected<AssignableComplexThing, Error>;
 
         static_assert(!std::is_nothrow_constructible_v<type::value_type>);
         static_assert(!std::is_nothrow_move_constructible_v<type::value_type>);
 
         const type a{std::in_place, {1, 2, 3}, 45, 69};
-        type b{kz::unexpected(Error::FlyingSquirrels)};
+        type b{std::unexpected(Error::FlyingSquirrels)};
 
         b = a;
 
@@ -353,13 +354,13 @@ TEST_CASE("expected assignments", "[expected]") {
 
 #if KZ_EXCEPTIONS
     SECTION("assign value to error - neither + throws exception on copy") {
-        using type = kz::expected<AssignableComplexThing, Error>;
+        using type = std::expected<AssignableComplexThing, Error>;
 
         static_assert(!std::is_nothrow_constructible_v<type::value_type>);
         static_assert(!std::is_nothrow_move_constructible_v<type::value_type>);
 
         const type a{std::in_place, {1, 2, 3}, 45, 69};
-        type b{kz::unexpected(Error::FlyingSquirrels)};
+        type b{std::unexpected(Error::FlyingSquirrels)};
 
         const_cast<AssignableComplexThing&>(*a).throwsOnCopy = true;
         REQUIRE_THROWS_AS(b = a, std::exception);
@@ -374,10 +375,10 @@ TEST_CASE("expected assignments", "[expected]") {
 #endif
 
     SECTION("assign error to value - is_nothrow_constructible_v<>") {
-        using type = kz::expected<IntValue, Error>;
+        using type = std::expected<IntValue, Error>;
         static_assert(std::is_nothrow_constructible_v<type::error_type>);
 
-        const type a{kz::unexpected(Error::FlyingSquirrels)};
+        const type a{std::unexpected(Error::FlyingSquirrels)};
         type b{111};
 
         b = a;
@@ -389,12 +390,12 @@ TEST_CASE("expected assignments", "[expected]") {
     }
 
     SECTION("assign error to value - is_nothrow_move_constructible_v<>") {
-        using type = kz::expected<IntValue, NotNoThrowConstructible>;
+        using type = std::expected<IntValue, NotNoThrowConstructible>;
 
         static_assert(!std::is_nothrow_constructible_v<type::error_type>);
         static_assert(std::is_nothrow_move_constructible_v<type::error_type>);
 
-        const type a{kz::unexpected(666)};
+        const type a{std::unexpected(666)};
         type b{222};
 
         b = a;
@@ -406,12 +407,12 @@ TEST_CASE("expected assignments", "[expected]") {
     }
 
     SECTION("assign error to value - neither") {
-        using type = kz::expected<IntValue, AssignableComplexThing>;
+        using type = std::expected<IntValue, AssignableComplexThing>;
 
         static_assert(!std::is_nothrow_constructible_v<type::error_type>);
         static_assert(!std::is_nothrow_move_constructible_v<type::error_type>);
 
-        const type a{kz::unexpected(
+        const type a{std::unexpected(
             AssignableComplexThing{std::vector<int>{1, 2, 3}, 45, 69})};
         type b{333};
 
@@ -429,12 +430,12 @@ TEST_CASE("expected assignments", "[expected]") {
 
 #if KZ_EXCEPTIONS
     SECTION("assign error to value - neither + throws exception on copy") {
-        using type = kz::expected<IntValue, AssignableComplexThing>;
+        using type = std::expected<IntValue, AssignableComplexThing>;
 
         static_assert(!std::is_nothrow_constructible_v<type::error_type>);
         static_assert(!std::is_nothrow_move_constructible_v<type::error_type>);
 
-        const type a{kz::unexpected(
+        const type a{std::unexpected(
             AssignableComplexThing{std::vector<int>{1, 2, 3}, 45, 69})};
         type b{333};
 
@@ -451,8 +452,8 @@ TEST_CASE("expected assignments", "[expected]") {
 #endif
 
     SECTION("assign value to value - void specialization") {
-        const kz::expected<void, Error> a;
-        kz::expected<void, Error> b;
+        const std::expected<void, Error> a;
+        std::expected<void, Error> b;
 
         b = a;
 
@@ -461,8 +462,9 @@ TEST_CASE("expected assignments", "[expected]") {
     }
 
     SECTION("assign error to error - void specialization") {
-        const kz::expected<void, Error> a{kz::unexpected(Error::FileNotFound)};
-        kz::expected<void, Error> b{kz::unexpected(Error::IOError)};
+        const std::expected<void, Error> a{
+            std::unexpected(Error::FileNotFound)};
+        std::expected<void, Error> b{std::unexpected(Error::IOError)};
 
         b = a;
 
@@ -473,9 +475,9 @@ TEST_CASE("expected assignments", "[expected]") {
     }
 
     SECTION("assign value to error - void specialization") {
-        using type = kz::expected<void, AssignableComplexThing>;
+        using type = std::expected<void, AssignableComplexThing>;
         const type a{};
-        type b{kz::unexpect, {1, 2, 3}, 45, 69};
+        type b{std::unexpect, {1, 2, 3}, 45, 69};
 
         b = a;
 
@@ -484,8 +486,8 @@ TEST_CASE("expected assignments", "[expected]") {
     }
 
     SECTION("error to value - void specialization") {
-        using type = kz::expected<void, AssignableComplexThing>;
-        const type a{kz::unexpect, {1, 2, 3}, 45, 69};
+        using type = std::expected<void, AssignableComplexThing>;
+        const type a{std::unexpect, {1, 2, 3}, 45, 69};
         type b{};
 
         b = a;
@@ -504,8 +506,8 @@ TEST_CASE("expected assignments", "[expected]") {
 TEST_CASE("expected move assignments", "[expected]") {
 
     SECTION("move value to value") {
-        kz::expected<IntMoveableValue, Error> a{111};
-        kz::expected<IntMoveableValue, Error> b{222};
+        std::expected<IntMoveableValue, Error> a{111};
+        std::expected<IntMoveableValue, Error> b{222};
 
         b = std::move(a);
 
@@ -516,8 +518,8 @@ TEST_CASE("expected move assignments", "[expected]") {
     }
 
     SECTION("move error to error") {
-        kz::expected<IntValue, IntMoveableValue> a{kz::unexpected(14)};
-        kz::expected<IntValue, IntMoveableValue> b{kz::unexpected(17)};
+        std::expected<IntValue, IntMoveableValue> a{std::unexpected(14)};
+        std::expected<IntValue, IntMoveableValue> b{std::unexpected(17)};
 
         b = std::move(a);
 
@@ -528,11 +530,11 @@ TEST_CASE("expected move assignments", "[expected]") {
     }
 
     SECTION("move_value_to_error - is_nothrow_move_constructible_v<>") {
-        using type = kz::expected<std::vector<int>, Error>;
+        using type = std::expected<std::vector<int>, Error>;
         static_assert(std::is_nothrow_move_constructible_v<type::value_type>);
 
         type a{std::in_place, {1, 2, 3}};
-        type b{kz::unexpected(Error::FlyingSquirrels)};
+        type b{std::unexpected(Error::FlyingSquirrels)};
 
         b = std::move(a);
 
@@ -543,12 +545,12 @@ TEST_CASE("expected move assignments", "[expected]") {
     }
 
     SECTION("move_value_to_error - fallback") {
-        using type = kz::expected<IntMoveableValue, Error>;
+        using type = std::expected<IntMoveableValue, Error>;
 
         static_assert(!std::is_nothrow_move_constructible_v<type::value_type>);
 
         type a{143};
-        type b{kz::unexpected(Error::FlyingSquirrels)};
+        type b{std::unexpected(Error::FlyingSquirrels)};
 
         b = std::move(a);
 
@@ -560,12 +562,12 @@ TEST_CASE("expected move assignments", "[expected]") {
 
 #if KZ_EXCEPTIONS
     SECTION("move_value_to_error - fallback - throws on move") {
-        using type = kz::expected<IntMoveableValue, Error>;
+        using type = std::expected<IntMoveableValue, Error>;
 
         static_assert(!std::is_nothrow_move_constructible_v<type::value_type>);
 
         type a{143};
-        type b{kz::unexpected(Error::FlyingSquirrels)};
+        type b{std::unexpected(Error::FlyingSquirrels)};
 
         a->throwsOnMove = true;
         REQUIRE_THROWS_AS(b = std::move(a), std::exception);
@@ -578,10 +580,10 @@ TEST_CASE("expected move assignments", "[expected]") {
 #endif
 
     SECTION("move_error_to_value - is_nothrow_move_constructible_v<>") {
-        using type = kz::expected<IntValue, std::vector<int>>;
+        using type = std::expected<IntValue, std::vector<int>>;
         static_assert(std::is_nothrow_move_constructible_v<type::error_type>);
 
-        type a{kz::unexpect, {1, 2, 3}};
+        type a{std::unexpect, {1, 2, 3}};
         type b{123};
 
         b = std::move(a);
@@ -593,11 +595,11 @@ TEST_CASE("expected move assignments", "[expected]") {
     }
 
     SECTION("move_error_to_value - fallback - throws on move") {
-        using type = kz::expected<IntValue, IntMoveableValue>;
+        using type = std::expected<IntValue, IntMoveableValue>;
 
         static_assert(!std::is_nothrow_move_constructible_v<type::error_type>);
 
-        type a{kz::unexpect, 143};
+        type a{std::unexpect, 143};
         type b{732};
 
         b = std::move(a);
@@ -610,11 +612,11 @@ TEST_CASE("expected move assignments", "[expected]") {
 
 #if KZ_EXCEPTIONS
     SECTION("move_error_to_value - fallback - throws on move") {
-        using type = kz::expected<IntValue, IntMoveableValue>;
+        using type = std::expected<IntValue, IntMoveableValue>;
 
         static_assert(!std::is_nothrow_move_constructible_v<type::error_type>);
 
-        type a{kz::unexpect, 143};
+        type a{std::unexpect, 143};
         type b{732};
 
         a.error().throwsOnMove = true;
@@ -628,8 +630,8 @@ TEST_CASE("expected move assignments", "[expected]") {
 #endif
 
     SECTION("move value to value - void specialization") {
-        kz::expected<void, Error> a{};
-        kz::expected<void, Error> b{};
+        std::expected<void, Error> a{};
+        std::expected<void, Error> b{};
 
         b = std::move(a);
 
@@ -638,8 +640,8 @@ TEST_CASE("expected move assignments", "[expected]") {
     }
 
     SECTION("move error to error - void specialization") {
-        kz::expected<void, IntMoveableValue> a{kz::unexpected(14)};
-        kz::expected<void, IntMoveableValue> b{kz::unexpected(17)};
+        std::expected<void, IntMoveableValue> a{std::unexpected(14)};
+        std::expected<void, IntMoveableValue> b{std::unexpected(17)};
 
         b = std::move(a);
 
@@ -650,9 +652,9 @@ TEST_CASE("expected move assignments", "[expected]") {
     }
 
     SECTION("move_value_to_error - void specialization") {
-        using type = kz::expected<void, Error>;
+        using type = std::expected<void, Error>;
         type a{};
-        type b{kz::unexpected(Error::FlyingSquirrels)};
+        type b{std::unexpected(Error::FlyingSquirrels)};
 
         b = std::move(a);
 
@@ -661,8 +663,8 @@ TEST_CASE("expected move assignments", "[expected]") {
     }
 
     SECTION("move_error_to_value - void specialization") {
-        using type = kz::expected<void, std::vector<int>>;
-        type a{kz::unexpect, {1, 2, 3}};
+        using type = std::expected<void, std::vector<int>>;
+        type a{std::unexpect, {1, 2, 3}};
         type b{};
 
         b = std::move(a);
@@ -675,9 +677,9 @@ TEST_CASE("expected move assignments", "[expected]") {
 
 #if KZ_EXCEPTIONS
     SECTION("move_error_to_value - void specialization - throws on move") {
-        using type = kz::expected<void, IntMoveableValue>;
+        using type = std::expected<void, IntMoveableValue>;
 
-        type a{kz::unexpect, 143};
+        type a{std::unexpect, 143};
         type b{};
 
         a.error().throwsOnMove = true;
@@ -692,46 +694,47 @@ TEST_CASE("expected move assignments", "[expected]") {
 
 TEST_CASE("expected other assignments", "[expected]") {
     SECTION("value") {
-        kz::expected<IntValue, Error> a{123};
+        std::expected<IntValue, Error> a{123};
         a = 456;
         REQUIRE(a.has_value());
         REQUIRE(*a == 456);
 
-        kz::expected<IntValue, Error> b{kz::unexpected(Error::FlyingSquirrels)};
+        std::expected<IntValue, Error> b{
+            std::unexpected(Error::FlyingSquirrels)};
         b = 789;
         REQUIRE(b.has_value());
         REQUIRE(*b == 789);
     }
 
     SECTION("unexpected - const&") {
-        kz::expected<IntValue, Error> a{123};
-        auto a2 = kz::unexpected(Error::FileNotFound);
+        std::expected<IntValue, Error> a{123};
+        auto a2 = std::unexpected(Error::FileNotFound);
         a = a2;
         REQUIRE(!a.has_value());
         REQUIRE(a.error() == Error::FileNotFound);
 
-        kz::expected<IntValue, Error> b{kz::unexpect, Error::IOError};
-        auto b2 = kz::unexpected(Error::FlyingSquirrels);
+        std::expected<IntValue, Error> b{std::unexpect, Error::IOError};
+        auto b2 = std::unexpected(Error::FlyingSquirrels);
         b = b2;
         REQUIRE(!b.has_value());
         REQUIRE(b.error() == Error::FlyingSquirrels);
 
-        kz::expected<void, Error> c{};
-        auto c2 = kz::unexpected(Error::FileNotFound);
+        std::expected<void, Error> c{};
+        auto c2 = std::unexpected(Error::FileNotFound);
         c = c2;
         REQUIRE(!c.has_value());
         REQUIRE(c.error() == Error::FileNotFound);
 
-        kz::expected<void, Error> d{kz::unexpect, Error::IOError};
-        auto d2 = kz::unexpected(Error::FlyingSquirrels);
+        std::expected<void, Error> d{std::unexpect, Error::IOError};
+        auto d2 = std::unexpected(Error::FlyingSquirrels);
         d = d2;
         REQUIRE(!d.has_value());
         REQUIRE(d.error() == Error::FlyingSquirrels);
     }
 
     SECTION("unexpected - &&") {
-        kz::expected<IntValue, IntMoveableValue> a{123};
-        auto a2 = kz::unexpected(IntMoveableValue{1});
+        std::expected<IntValue, IntMoveableValue> a{123};
+        auto a2 = std::unexpected(IntMoveableValue{1});
         // TODO: this appears to be optimized to use a constructor:
         // expected(unexpected<E>&&) and do "the right thing", except
         // it's not calling operator=()..., same for all 4 cases below. We
@@ -742,22 +745,22 @@ TEST_CASE("expected other assignments", "[expected]") {
         REQUIRE(a.error() == 1);
         REQUIRE(a2.value() == 0);
 
-        kz::expected<IntValue, IntMoveableValue> b{kz::unexpect, -1};
-        auto b2 = kz::unexpected(IntMoveableValue{2});
+        std::expected<IntValue, IntMoveableValue> b{std::unexpect, -1};
+        auto b2 = std::unexpected(IntMoveableValue{2});
         b = std::move(b2);
         REQUIRE(!b.has_value());
         REQUIRE(b.error() == 2);
         REQUIRE(b2.value() == 0);
 
-        kz::expected<void, IntMoveableValue> c{};
-        auto c2 = kz::unexpected(IntMoveableValue{3});
+        std::expected<void, IntMoveableValue> c{};
+        auto c2 = std::unexpected(IntMoveableValue{3});
         c = std::move(c2);
         REQUIRE(!c.has_value());
         REQUIRE(c.error() == 3);
         REQUIRE(c2.value() == 0);
 
-        kz::expected<void, IntMoveableValue> d{kz::unexpect, -2};
-        auto d2 = kz::unexpected(IntMoveableValue{4});
+        std::expected<void, IntMoveableValue> d{std::unexpect, -2};
+        auto d2 = std::unexpected(IntMoveableValue{4});
         d = std::move(d2);
         REQUIRE(!d.has_value());
         REQUIRE(d.error() == 4);
@@ -767,7 +770,7 @@ TEST_CASE("expected other assignments", "[expected]") {
 
 TEST_CASE("�.�.4.4, modifiers", "[expected]") {
     SECTION("emplace() - void - has value") {
-        kz::expected<void, Error> a;
+        std::expected<void, Error> a;
 
         a.emplace();
 
@@ -775,7 +778,7 @@ TEST_CASE("�.�.4.4, modifiers", "[expected]") {
     }
 
     SECTION("emplace() - void - has error") {
-        kz::expected<void, IntValue> a(std::unexpect, 200);
+        std::expected<void, IntValue> a(std::unexpect, 200);
 
         a.emplace();
 
@@ -783,7 +786,7 @@ TEST_CASE("�.�.4.4, modifiers", "[expected]") {
     }
 
     SECTION("emplace() - has value") {
-        kz::expected<SimpleThing, Error> a{std::in_place, 3, 7};
+        std::expected<SimpleThing, Error> a{std::in_place, 3, 7};
         REQUIRE(a->x == 3);
         REQUIRE(a->y == 7);
 
@@ -795,7 +798,7 @@ TEST_CASE("�.�.4.4, modifiers", "[expected]") {
     }
 
     SECTION("emplace() - has error") {
-        kz::expected<IntValue, Error> a{kz::unexpect, Error::FileNotFound};
+        std::expected<IntValue, Error> a{std::unexpect, Error::FileNotFound};
         static_assert(
             std::is_nothrow_constructible_v<decltype(a)::value_type, int>);
 
@@ -806,7 +809,7 @@ TEST_CASE("�.�.4.4, modifiers", "[expected]") {
     }
 
     SECTION("emplace(initializer_list) - has value") {
-        kz::expected<SimpleThing, Error> a{std::in_place, 3, 7};
+        std::expected<SimpleThing, Error> a{std::in_place, 3, 7};
 
         REQUIRE(a->n == 0);
         REQUIRE(a->x == 3);
@@ -822,7 +825,7 @@ TEST_CASE("�.�.4.4, modifiers", "[expected]") {
     }
 
     SECTION("emplace(initializer_list) - has error") {
-        kz::expected<SimpleThing, Error> a{kz::unexpect, Error::FileNotFound};
+        std::expected<SimpleThing, Error> a{std::unexpect, Error::FileNotFound};
 
         static_assert(std::is_nothrow_constructible_v<decltype(a)::value_type,
             std::initializer_list<int>, int, int>);
@@ -839,8 +842,8 @@ TEST_CASE("�.�.4.4, modifiers", "[expected]") {
 
 TEST_CASE("�.�.4.5, swap", "[expected]") {
     SECTION("swap two values") {
-        kz::expected<IntValue, Error> a{123};
-        kz::expected<IntValue, Error> b{456};
+        std::expected<IntValue, Error> a{123};
+        std::expected<IntValue, Error> b{456};
 
         a.swap(b);
 
@@ -849,8 +852,8 @@ TEST_CASE("�.�.4.5, swap", "[expected]") {
     }
 
     SECTION("swap two errors") {
-        kz::expected<IntValue, Error> a{kz::unexpect, Error::FileNotFound};
-        kz::expected<IntValue, Error> b{kz::unexpect, Error::FlyingSquirrels};
+        std::expected<IntValue, Error> a{std::unexpect, Error::FileNotFound};
+        std::expected<IntValue, Error> b{std::unexpect, Error::FlyingSquirrels};
         a.swap(b);
 
         REQUIRE(a.error() == Error::FlyingSquirrels);
@@ -858,9 +861,9 @@ TEST_CASE("�.�.4.5, swap", "[expected]") {
     }
 
     SECTION("swap value and error - path 1 - nothrow") {
-        using type = kz::expected<IntValue, Error>;
+        using type = std::expected<IntValue, Error>;
         type a{123};
-        type b{kz::unexpect, Error::IOError};
+        type b{std::unexpect, Error::IOError};
         static_assert(std::is_nothrow_move_constructible_v<type::error_type>);
 
         a.swap(b);
@@ -877,9 +880,9 @@ TEST_CASE("�.�.4.5, swap", "[expected]") {
     // TODO: SECTION("swap value and error - path 1 - throw")
 
     SECTION("swap value and error - path 2 - nothrow") {
-        using type = kz::expected<IntValue, IntMoveableValue>;
+        using type = std::expected<IntValue, IntMoveableValue>;
         type a{123};
-        type b{kz::unexpect, 456};
+        type b{std::unexpect, 456};
 
         static_assert(!std::is_nothrow_move_constructible_v<type::error_type>);
         static_assert(std::is_nothrow_move_constructible_v<type::value_type>);
@@ -902,8 +905,8 @@ TEST_CASE("�.�.4.5, swap", "[expected]") {
     // TODO: SECTION("swap value and error - path 2 - throw")
 
     SECTION("swap two values - void specialization") {
-        kz::expected<void, Error> a{};
-        kz::expected<void, Error> b{};
+        std::expected<void, Error> a{};
+        std::expected<void, Error> b{};
 
         a.swap(b);
 
@@ -912,8 +915,8 @@ TEST_CASE("�.�.4.5, swap", "[expected]") {
     }
 
     SECTION("swap two errors - void specialization") {
-        kz::expected<void, Error> a{kz::unexpect, Error::FileNotFound};
-        kz::expected<void, Error> b{kz::unexpect, Error::IOError};
+        std::expected<void, Error> a{std::unexpect, Error::FileNotFound};
+        std::expected<void, Error> b{std::unexpect, Error::IOError};
 
         a.swap(b);
 
@@ -924,8 +927,8 @@ TEST_CASE("�.�.4.5, swap", "[expected]") {
     }
 
     SECTION("swap value and error - void specialization") {
-        kz::expected<void, Error> a{};
-        kz::expected<void, Error> b{kz::unexpect, Error::FlyingSquirrels};
+        std::expected<void, Error> a{};
+        std::expected<void, Error> b{std::unexpect, Error::FlyingSquirrels};
 
         a.swap(b);
 
@@ -941,8 +944,8 @@ TEST_CASE("�.�.4.5, swap", "[expected]") {
     }
 
     SECTION("swap()") {
-        kz::expected<IntValue, Error> a{123};
-        kz::expected<IntValue, Error> b{456};
+        std::expected<IntValue, Error> a{123};
+        std::expected<IntValue, Error> b{456};
 
         std::swap(a, b);
 
@@ -953,12 +956,12 @@ TEST_CASE("�.�.4.5, swap", "[expected]") {
 
 TEST_CASE("Equality operators", "[expected]") {
     SECTION("expected and expected") {
-        const kz::expected<int, int> a{1};
-        const kz::expected<int, int> b{2};
-        const kz::expected<int, int> c{2};
-        const kz::expected<int, int> d{kz::unexpect, 1};
-        const kz::expected<int, int> e{kz::unexpect, 2};
-        const kz::expected<int, int> f{kz::unexpect, 2};
+        const std::expected<int, int> a{1};
+        const std::expected<int, int> b{2};
+        const std::expected<int, int> c{2};
+        const std::expected<int, int> d{std::unexpect, 1};
+        const std::expected<int, int> e{std::unexpect, 2};
+        const std::expected<int, int> f{std::unexpect, 2};
 
         REQUIRE(a != b);
         REQUIRE(a != d);
@@ -971,31 +974,31 @@ TEST_CASE("Equality operators", "[expected]") {
         REQUIRE(a == 1);
         REQUIRE(b == 2);
 
-        REQUIRE(d == kz::unexpected<int>(1));
-        REQUIRE(e == kz::unexpected<int>(2));
+        REQUIRE(d == std::unexpected<int>(1));
+        REQUIRE(e == std::unexpected<int>(2));
     }
 
     SECTION("expected and expected - void specialization") {
-        const kz::expected<void, int> a{};
-        const kz::expected<void, int> b{};
-        const kz::expected<void, int> d{kz::unexpect, 1};
-        const kz::expected<void, int> e{kz::unexpect, 2};
-        const kz::expected<void, int> f{kz::unexpect, 2};
+        const std::expected<void, int> a{};
+        const std::expected<void, int> b{};
+        const std::expected<void, int> d{std::unexpect, 1};
+        const std::expected<void, int> e{std::unexpect, 2};
+        const std::expected<void, int> f{std::unexpect, 2};
 
         REQUIRE(a == b);
         REQUIRE(a != e);
         REQUIRE(d != e);
         REQUIRE(e == f);
 
-        REQUIRE(d == kz::unexpected<int>(1));
-        REQUIRE(e == kz::unexpected<int>(2));
+        REQUIRE(d == std::unexpected<int>(1));
+        REQUIRE(e == std::unexpected<int>(2));
     }
 
     SECTION("expected and expected - mix and match void specialization") {
-        const kz::expected<int, int> a{1};
-        const kz::expected<void, int> b{};
-        const kz::expected<int, int> c{kz::unexpect, 1};
-        const kz::expected<void, int> d{kz::unexpect, 1};
+        const std::expected<int, int> a{1};
+        const std::expected<void, int> b{};
+        const std::expected<int, int> c{std::unexpect, 1};
+        const std::expected<void, int> d{std::unexpect, 1};
 
         REQUIRE(a != c);
         REQUIRE(b != d);
@@ -1005,7 +1008,7 @@ TEST_CASE("Equality operators", "[expected]") {
     }
 
     SECTION("expected and value") {
-        const kz::expected<int, int> a{22};
+        const std::expected<int, int> a{22};
         REQUIRE(a == 22);
         REQUIRE(22 == a);
         REQUIRE(a != 44);
@@ -1013,10 +1016,10 @@ TEST_CASE("Equality operators", "[expected]") {
     }
 
     SECTION("expected and unexpected") {
-        const kz::expected<int, int> a{kz::unexpect, 100};
-        REQUIRE(a == kz::unexpected(100));
-        REQUIRE(kz::unexpected(100) == a);
-        REQUIRE(a != kz::unexpected(200));
-        REQUIRE(kz::unexpected(200) != a);
+        const std::expected<int, int> a{std::unexpect, 100};
+        REQUIRE(a == std::unexpected(100));
+        REQUIRE(std::unexpected(100) == a);
+        REQUIRE(a != std::unexpected(200));
+        REQUIRE(std::unexpected(200) != a);
     }
 }

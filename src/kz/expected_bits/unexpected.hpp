@@ -27,6 +27,10 @@
 
 #pragma once
 
+#define unexpected() deprecated_unexpected()
+#include <exception>
+#undef unexpected
+
 #include <initializer_list>
 #include <type_traits>
 #include <utility>

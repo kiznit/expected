@@ -35,7 +35,7 @@ TEST_CASE("static assertions", "[expected]") {
     using T = std::expected<short, bool>;
     static_assert(std::is_same_v<T::value_type, short>);
     static_assert(std::is_same_v<T::error_type, bool>);
-    static_assert(std::is_same_v<T::unexpected_type, kz::unexpected<bool>>);
+    static_assert(std::is_same_v<T::unexpected_type, std::unexpected<bool>>);
 
     using U = std::expected<void, bool>;
     static_assert(std::is_void_v<U::value_type>);
@@ -56,11 +56,11 @@ TEST_CASE("rebind<>", "[expected]") {
 TEST_CASE("is_specialization<>", "[expected]") {
     using T1 = int;
     using T2 = std::vector<int>;
-    using T3 = kz::unexpected<int>;
+    using T3 = std::unexpected<int>;
 
-    static_assert(!kz::detail::is_specialization<T1, kz::unexpected>::value);
-    static_assert(!kz::detail::is_specialization<T2, kz::unexpected>::value);
-    static_assert(kz::detail::is_specialization<T3, kz::unexpected>::value);
+    static_assert(!kz::detail::is_specialization<T1, std::unexpected>::value);
+    static_assert(!kz::detail::is_specialization<T2, std::unexpected>::value);
+    static_assert(kz::detail::is_specialization<T3, std::unexpected>::value);
 }
 
 // TODO: how do we speciailize cv void? do we need to do anything?
@@ -413,15 +413,15 @@ TEST_CASE("Destructor", "[expected]") {
 TEST_CASE("observers", "[expected]") {
 
     SECTION("operator bool / has_value()") {
-        kz::expected<int, Error> a{123};
-        kz::expected<int, Error> b{kz::unexpected(Error::FlyingSquirrels)};
+        std::expected<int, Error> a{123};
+        std::expected<int, Error> b{std::unexpected(Error::FlyingSquirrels)};
         REQUIRE(a);
         REQUIRE(a.has_value());
         REQUIRE(!b);
         REQUIRE(!b.has_value());
 
-        kz::expected<void, Error> c;
-        kz::expected<void, Error> d{kz::unexpected(Error::FlyingSquirrels)};
+        std::expected<void, Error> c;
+        std::expected<void, Error> d{std::unexpected(Error::FlyingSquirrels)};
         REQUIRE(c);
         REQUIRE(c.has_value());
         REQUIRE(!d);
@@ -429,105 +429,107 @@ TEST_CASE("observers", "[expected]") {
     }
 
     SECTION("operator->()") {
-        kz::expected<CopyConstructible, Error> a{11};
+        std::expected<CopyConstructible, Error> a{11};
         REQUIRE(a->value == 11);
 
         *a.operator->() = 22;
         REQUIRE(a->value == 22);
 
-        const kz::expected<CopyConstructible, Error> b{33};
+        const std::expected<CopyConstructible, Error> b{33};
         REQUIRE(b->value == 33);
     }
 
     SECTION("operator*()") {
         // &
-        kz::expected<int, Error> a{11};
+        std::expected<int, Error> a{11};
         REQUIRE(*a == 11);
 
         // const&
-        const kz::expected<int, Error> b{22};
+        const std::expected<int, Error> b{22};
         REQUIRE(*b == 22);
 
         // &&
-        kz::expected<int, Error> c{33};
+        std::expected<int, Error> c{33};
         REQUIRE(*std::move(c) == 33);
 
         // const&&
-        const kz::expected<int, Error> d{44};
+        const std::expected<int, Error> d{44};
         REQUIRE(*std::move(d) == 44);
     }
 
     SECTION("value() - has value") {
         // &
-        kz::expected<int, Error> a{11};
+        std::expected<int, Error> a{11};
         REQUIRE(a.value() == 11);
 
         // const&
-        const kz::expected<int, Error> b{22};
+        const std::expected<int, Error> b{22};
         REQUIRE(b.value() == 22);
 
         // &&
-        kz::expected<int, Error> c{33};
+        std::expected<int, Error> c{33};
         REQUIRE(std::move(c).value() == 33);
 
         // const&&
-        const kz::expected<int, Error> d{44};
+        const std::expected<int, Error> d{44};
         REQUIRE(std::move(d).value() == 44);
     }
 
 #if KZ_EXCEPTIONS
     SECTION("value() - has error") {
         // &
-        kz::expected<int, Error> a{kz::unexpected(Error::FileNotFound)};
-        REQUIRE_THROWS_AS(a.value(), kz::bad_expected_access<Error>);
+        std::expected<int, Error> a{std::unexpected(Error::FileNotFound)};
+        REQUIRE_THROWS_AS(a.value(), std::bad_expected_access<Error>);
 
         // const&
-        const kz::expected<int, Error> b{kz::unexpected(Error::FileNotFound)};
-        REQUIRE_THROWS_AS(b.value(), kz::bad_expected_access<Error>);
+        const std::expected<int, Error> b{std::unexpected(Error::FileNotFound)};
+        REQUIRE_THROWS_AS(b.value(), std::bad_expected_access<Error>);
 
         // &&
-        kz::expected<int, Error> c{kz::unexpected(Error::FileNotFound)};
-        REQUIRE_THROWS_AS(std::move(c).value(), kz::bad_expected_access<Error>);
+        std::expected<int, Error> c{std::unexpected(Error::FileNotFound)};
+        REQUIRE_THROWS_AS(
+            std::move(c).value(), std::bad_expected_access<Error>);
 
         // const&&
-        const kz::expected<int, Error> d{kz::unexpected(Error::FileNotFound)};
-        REQUIRE_THROWS_AS(std::move(d).value(), kz::bad_expected_access<Error>);
+        const std::expected<int, Error> d{std::unexpected(Error::FileNotFound)};
+        REQUIRE_THROWS_AS(
+            std::move(d).value(), std::bad_expected_access<Error>);
     }
 #endif
 
     SECTION("error()") {
         // &
-        kz::expected<int, int> a{kz::unexpected{11}};
+        std::expected<int, int> a{std::unexpected{11}};
         REQUIRE(a.error() == 11);
 
         // const&
-        const kz::expected<int, int> b{kz::unexpected{22}};
+        const std::expected<int, int> b{std::unexpected{22}};
         REQUIRE(b.error() == 22);
 
         // &&
-        kz::expected<int, int> c{kz::unexpected{33}};
+        std::expected<int, int> c{std::unexpected{33}};
         REQUIRE(std::move(c).error() == 33);
 
         // const&&
-        const kz::expected<int, int> d{kz::unexpected{44}};
+        const std::expected<int, int> d{std::unexpected{44}};
         REQUIRE(std::move(d).error() == 44);
     }
 
     SECTION("value_or()") {
         // value - const&
-        const kz::expected<int, Error> a{31};
+        const std::expected<int, Error> a{31};
         REQUIRE(a.value_or(42) == 31);
 
         // error - const&
-        const kz::expected<int, Error> b{kz::unexpected(Error::IOError)};
+        const std::expected<int, Error> b{std::unexpected(Error::IOError)};
         REQUIRE(b.value_or(42) == 42);
 
         // value - &&
-        kz::expected<int, Error> c{69};
+        std::expected<int, Error> c{69};
         REQUIRE(std::move(c).value_or(777) == 69);
 
         // error - &&
-        kz::expected<int, Error> d{kz::unexpected(Error::FileNotFound)};
+        std::expected<int, Error> d{std::unexpected(Error::FileNotFound)};
         REQUIRE(std::move(d).value_or(84) == 84);
     }
 }

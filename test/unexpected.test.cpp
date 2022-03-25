@@ -25,12 +25,12 @@
     POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <kz/expected_bits/unexpected.hpp>
+#include <expected>
 #include <catch2/catch.hpp>
 #include "value.hpp"
 
 TEST_CASE("unexpected static assertions", "[unexpected]") {
-    using T = kz::unexpected<int>;
+    using T = std::unexpected<int>;
 
     static_assert(!std::is_default_constructible_v<T>);
     static_assert(std::is_trivially_copyable_v<T>);
@@ -39,19 +39,19 @@ TEST_CASE("unexpected static assertions", "[unexpected]") {
 
 TEST_CASE("unexpected constructors", "[unexpected]") {
     SECTION("from value") {
-        kz::unexpected<int> a{123};
+        std::unexpected<int> a{123};
         REQUIRE(a.value() == 123);
     }
 
     SECTION("in-place with value") {
-        kz::unexpected<int> a{std::in_place, 123};
+        std::unexpected<int> a{std::in_place, 123};
         REQUIRE(a.value() == 123);
     }
 
     SECTION("in-place with multiple parameters") {
         const CopyConstructible a{100};
         MoveConstructible b{200};
-        kz::unexpected<ComplexThing> c{std::in_place, a, std::move(b)};
+        std::unexpected<ComplexThing> c{std::in_place, a, std::move(b)};
 
         REQUIRE(c.value().a.value == 100);
         REQUIRE(c.value().b.value == 200);
@@ -61,14 +61,14 @@ TEST_CASE("unexpected constructors", "[unexpected]") {
     }
 
     SECTION("in-place with initializer list") {
-        kz::unexpected<std::vector<int>> a{std::in_place, {1, 2, 3}};
+        std::unexpected<std::vector<int>> a{std::in_place, {1, 2, 3}};
         REQUIRE(a.value().size() == 3);
     }
 
     SECTION("in-place with initializer list and extra parameters") {
         const CopyConstructible a{100};
         MoveConstructible b{200};
-        kz::unexpected<ComplexThing> c{
+        std::unexpected<ComplexThing> c{
             std::in_place, {1, 2, 3}, a, std::move(b)};
         REQUIRE(c.value().a.value == 100);
         REQUIRE(c.value().b.value == 200);
@@ -79,21 +79,21 @@ TEST_CASE("unexpected constructors", "[unexpected]") {
 
     SECTION("copy") {
 
-        const kz::unexpected<int> a{123};
-        kz::unexpected<int> b{a};
+        const std::unexpected<int> a{123};
+        std::unexpected<int> b{a};
         REQUIRE(a.value() == 123);
         REQUIRE(b.value() == 123);
     }
 
     SECTION("move") {
-        kz::unexpected<MoveConstructible> a{42};
-        kz::unexpected<MoveConstructible> b{std::move(a)};
+        std::unexpected<MoveConstructible> a{42};
+        std::unexpected<MoveConstructible> b{std::move(a)};
         REQUIRE(a.value().value == -1);
         REQUIRE(b.value().value == 42);
     }
 
     SECTION("template argument deduction guide") {
-        kz::unexpected a{int{33}};
+        std::unexpected a{int{33}};
         REQUIRE(a.value() == 33);
     }
 }
@@ -101,16 +101,16 @@ TEST_CASE("unexpected constructors", "[unexpected]") {
 TEST_CASE("unexpected assignments", "[unexpected]") {
 
     SECTION("by value") {
-        kz::unexpected<int> a{10};
-        kz::unexpected<int> b{20};
+        std::unexpected<int> a{10};
+        std::unexpected<int> b{20};
         a = b;
         REQUIRE(a.value() == 20);
         REQUIRE(b.value() == 20);
     }
 
     SECTION("by move") {
-        kz::unexpected<MoveAssignable> a{10};
-        kz::unexpected<MoveAssignable> b{20};
+        std::unexpected<MoveAssignable> a{10};
+        std::unexpected<MoveAssignable> b{20};
         a = std::move(b);
         REQUIRE(a.value().value == 20);
         REQUIRE(b.value().value == -1);
@@ -121,19 +121,19 @@ TEST_CASE("unexpected accessors", "[unexpected]") {
 
     SECTION("value() - has value") {
         // &
-        kz::unexpected<int> a{11};
+        std::unexpected<int> a{11};
         REQUIRE(a.value() == 11);
 
         // const&
-        const kz::unexpected<int> b{22};
+        const std::unexpected<int> b{22};
         REQUIRE(b.value() == 22);
 
         // &&
-        kz::unexpected<int> c{33};
+        std::unexpected<int> c{33};
         REQUIRE(std::move(c).value() == 33);
 
         // const&&
-        const kz::unexpected<int> d{44};
+        const std::unexpected<int> d{44};
         REQUIRE(std::move(d).value() == 44);
     }
 }
@@ -141,8 +141,8 @@ TEST_CASE("unexpected accessors", "[unexpected]") {
 TEST_CASE("unexpected swap", "[unexpected]") {
 
     SECTION("member swap()") {
-        kz::unexpected<int> a{3};
-        kz::unexpected<int> b{7};
+        std::unexpected<int> a{3};
+        std::unexpected<int> b{7};
 
         a.swap(b);
 
@@ -151,8 +151,8 @@ TEST_CASE("unexpected swap", "[unexpected]") {
     }
 
     SECTION("std::swap") {
-        kz::unexpected<int> a{100};
-        kz::unexpected<int> b{200};
+        std::unexpected<int> a{100};
+        std::unexpected<int> b{200};
 
         using std::swap;
         swap(a, b);
@@ -165,18 +165,18 @@ TEST_CASE("unexpected swap", "[unexpected]") {
 TEST_CASE("unexpected comparisons", "[unexpected]") {
 
     SECTION("==") {
-        kz::unexpected<int> a{44};
-        kz::unexpected<int> b{44};
-        kz::unexpected<int> c{55};
+        std::unexpected<int> a{44};
+        std::unexpected<int> b{44};
+        std::unexpected<int> c{55};
 
         REQUIRE(a == b);
         REQUIRE(!(a == c));
     }
 
     SECTION("!=") {
-        kz::unexpected<int> a{66};
-        kz::unexpected<int> b{66};
-        kz::unexpected<int> c{77};
+        std::unexpected<int> a{66};
+        std::unexpected<int> b{66};
+        std::unexpected<int> c{77};
 
         REQUIRE(a != c);
         REQUIRE(!(a != b));

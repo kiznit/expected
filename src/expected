@@ -27,26 +27,15 @@
 
 #pragma once
 
+// Some C++ libraries (all of them really) still define std::unexpected() as a
+// function in header <exception> in C++ 20 mode. This macro trickery is used to
+// work around the issue.
+#define unexpected() unexpected_deprecated()
+#include <exception>
+#undef unexpected
+
 #include <kz/expected.hpp>
 
 namespace std {
-
-#if _MSC_VER || !KZ_EXCEPTIONS
-
     using namespace kz;
-
-#else
-
-    // With GCC, clang and mingw, we cannot import or define std::unexpected in
-    // namespace std as there is alreaydy a function with that name. For this
-    // reason, we import as much as we need and import kz::unexpected as
-    // std::unexpected_.
-    using kz::bad_expected_access;
-    using kz::expected;
-    template <class E>
-    using unexpected_ = kz::unexpected<E>;
-    using kz::unexpect;
-
-#endif
-
 } // namespace std
