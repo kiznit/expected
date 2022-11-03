@@ -1,4 +1,7 @@
 {
     "editor.formatOnSave": true,
-    "cmake.configureOnOpen": false
+    "cmake.configureOnOpen": false,
+    "files.associations": {
+        "type_traits": "cpp"
+    }
 }

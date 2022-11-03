@@ -19,17 +19,21 @@ jobs:
           - { os: 'ubuntu-latest',  compiler: 'clang', version: 11 }
           - { os: 'ubuntu-latest',  compiler: 'clang', version: 12 }
           - { os: 'ubuntu-latest',  compiler: 'clang', version: 13 }
+          - { os: 'ubuntu-latest',  compiler: 'clang', version: 14 }
+          - { os: 'ubuntu-latest',  compiler: 'clang', version: 15 }
 
           - { os: 'ubuntu-latest',  compiler: 'gcc',   version: 9 }
           - { os: 'ubuntu-latest',  compiler: 'gcc',   version: 10 }
           - { os: 'ubuntu-latest',  compiler: 'gcc',   version: 11 }
+          #- { os: 'ubuntu-latest',  compiler: 'gcc',   version: 12 }
+          #- { os: 'ubuntu-latest',  compiler: 'gcc',   version: 13 }
 
           - { os: 'windows-latest', compiler: 'mingw', version: '9.4.0',  config: "-G 'MinGW Makefiles'" }
           - { os: 'windows-latest', compiler: 'mingw', version: '10.3.0', config: "-G 'MinGW Makefiles'" }
           - { os: 'windows-latest', compiler: 'mingw', version: '11.2.0', config: "-G 'MinGW Makefiles'" }
 
           - { os: 'windows-2019',   compiler: 'msvc',  version: '19.29' } # Visual Studio 2019
-          - { os: 'windows-2022',   compiler: 'msvc',  version: '19.30' } # Visual Studio 2022
+          - { os: 'windows-2022',   compiler: 'msvc',  version: '19.33' } # Visual Studio 2022
 
     name:  "Unit tests: ${{matrix.compiler}}-${{matrix.version}}"
 
