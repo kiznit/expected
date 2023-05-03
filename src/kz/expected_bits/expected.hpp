@@ -33,7 +33,13 @@
 
 // clang does not suport P0848R3. Details at https://clang.llvm.org/cxx_status.html#cxx20.
 // Older versions of GCC / mingw will crash (ICE).
-#if defined(__clang__) || (defined(__GNUC__) && __GNUC__ < 10)
+#if defined(__clang__)
+    #if __clang_major__ < 15
+        #define KZ_P0848R3 0
+    #else
+        #define KZ_P0848R3 1
+    #endif
+#elif defined(__GNUC__) && __GNUC__ < 10
 #define KZ_P0848R3 0
 #else
 #define KZ_P0848R3 1
