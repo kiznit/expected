@@ -532,4 +532,105 @@ TEST_CASE("observers", "[expected]") {
         std::expected<int, Error> d{std::unexpected(Error::FileNotFound)};
         REQUIRE(std::move(d).value_or(84) == 84);
     }
+
+    SECTION("error_or()") {
+        // value - const&
+        const std::expected<int, Error> a{31};
+        REQUIRE(a.error_or(Error::FlyingSquirrels) == Error::FlyingSquirrels);
+
+        // error - const&
+        const std::expected<int, Error> b{std::unexpected(Error::IOError)};
+        REQUIRE(b.error_or(Error::FlyingSquirrels) == Error::IOError);
+
+        // value - &&
+        std::expected<int, Error> c{69};
+        REQUIRE(std::move(c).error_or(Error::FlyingSquirrels) ==
+                Error::FlyingSquirrels);
+
+        // error - &&
+        std::expected<int, Error> d{std::unexpected(Error::FileNotFound)};
+        REQUIRE(std::move(d).error_or(Error::FlyingSquirrels) ==
+                Error::FileNotFound);
+    }
+
+    SECTION("and_then()") {
+        const std::expected<int, Error> a{12};
+        const auto a2 = a.and_then([](int value) -> std::expected<bool, Error> {
+            return value == 12;
+        });
+        REQUIRE(a2 == true);
+    }
+
+    SECTION("or_else()") {
+        const std::expected<int, Error> a{std::unexpected(Error::IOError)};
+        const auto a2 =
+            a.or_else([](Error error) -> std::expected<bool, Error> {
+                return std::unexpected(error);
+            });
+        REQUIRE(a2.error() == Error::IOError);
+    }
+
+    SECTION("transform()") {
+
+        // Function with return value
+        const std::expected<int, Error> a{10};
+        const auto a2 = a.transform([](int x) -> int { return x + 1; });
+        REQUIRE(a2 == 11);
+
+        // void function
+        bool called = false;
+        a.transform([&called](int) -> void { called = true; });
+        REQUIRE(called);
+
+        // Error
+        const std::expected<int, Error> b{std::unexpected(Error::IOError)};
+        const auto b2 = b.transform([](int x) -> int { return x + 1; });
+        REQUIRE(b2.error() == Error::IOError);
+    }
+
+    SECTION("transform_error()") {
+        // Value
+        const std::expected<int, Error> a{60};
+        const auto a2 = a.transform_error(
+            [](Error) -> Error { return Error::FlyingSquirrels; });
+        REQUIRE(a2);
+
+        // Error
+        const std::expected<int, Error> b{std::unexpected(Error::IOError)};
+        const auto b2 = b.transform_error(
+            [](Error) -> Error { return Error::FlyingSquirrels; });
+        REQUIRE(b2.error() == Error::FlyingSquirrels);
+    }
+
+    SECTION("transform() - void specialization") {
+
+        // Function with return value
+        const std::expected<void, Error> a{};
+        const auto a2 = a.transform([]() {});
+        REQUIRE(a2);
+
+        // void function
+        bool called = false;
+        a.transform([&called]() -> void { called = true; });
+        REQUIRE(called);
+
+        // Error
+        const std::expected<void, Error> b{std::unexpected(Error::IOError)};
+        const auto b2 = b.transform([]() -> int { return 7; });
+        REQUIRE(b2.error() == Error::IOError);
+    }
+
+    SECTION("transform_error() - void specialization") {
+        // Value
+        const std::expected<void, Error> a{};
+        const auto a2 = a.transform_error(
+            [](Error) -> Error { return Error::FlyingSquirrels; });
+        REQUIRE(a2);
+
+        // Error
+        const std::expected<void, Error> b{std::unexpected(Error::IOError)};
+        const auto b2 = b.transform_error(
+            [](Error) -> Error { return Error::FlyingSquirrels; });
+        REQUIRE(b2.error() == Error::FlyingSquirrels);
+    }
 }

@@ -14,6 +14,7 @@ Testing is done using different versions of GCC, clang, mingw and MSVC. You can 
 - Requires C++ 20 (some might not consider this a feature).
 - Works with or without C++ exceptions enabled.
 - Follows the [P0323R12](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p0323r12.html) proposal as closely as possible.
+- Implements the [P2505R5](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2505r5.html) proposal as well.
 
 ## namespace std
 

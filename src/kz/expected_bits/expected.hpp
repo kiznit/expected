@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <kz/expected_bits/exception.hpp>
 #include <kz/expected_bits/unexpected.hpp>
@@ -561,19 +562,196 @@ namespace kz {
         constexpr E&&       error() &&      { return std::move(_error); }
 
         template <class U>
-        constexpr T value_or(U&& v) const& {
-            return _has_value ? _value
-                               : static_cast<T>(std::forward<U>(v));
+        constexpr T value_or(U&& v) const & {
+            return _has_value ? _value : static_cast<T>(std::forward<U>(v));
         }
 
         template <class U>
         constexpr T value_or(U&& v) && {
-            return _has_value ? std::move(_value)
-                               : static_cast<T>(std::forward<U>(v));
+            return _has_value ? std::move(_value) : static_cast<T>(std::forward<U>(v));
+        }
+
+        template<class G = E>
+        constexpr E error_or(G&& e) const &
+        {
+            return _has_value ? std::forward<G>(e) :  _error;
+        }
+
+        template<class G = E>
+        constexpr E error_or(G&& e) &&
+        {
+            return _has_value ? std::forward<G>(e) :  std::move(_error);
+        }
+
+        template <class F>
+        requires(std::is_copy_constructible_v<E>)
+        constexpr auto and_then(F&& f) &
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F, decltype(value())>>;
+            return _has_value ? std::invoke(std::forward<F>(f), value()) : U(unexpect, error());
+        }
+
+        template <class F>
+        requires(std::is_copy_constructible_v<E>)
+        constexpr auto and_then(F&& f) const &
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F, decltype(value())>>;
+            return _has_value ? std::invoke(std::forward<F>(f), value()) : U(unexpect, error());
+        }
+
+        template <class F>
+        requires(std::is_move_constructible_v<E>)
+        constexpr auto and_then(F&& f) &&
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F, decltype(std::move(value()))>>;
+            return _has_value ? std::invoke(std::forward<F>(f), std::move(value())) : U(unexpect, std::move(error()));
+        }
+
+        template <class F>
+        requires(std::is_move_constructible_v<E>)
+        constexpr auto and_then(F&& f) const &&
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F, decltype(std::move(value()))>>;
+            return _has_value ? std::invoke(std::forward<F>(f), std::move(value())) : U(unexpect, std::move(error()));
+        }
+
+        template <class F>
+        requires(std::is_copy_constructible_v<T>)
+        constexpr auto or_else(F&& f) &
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(error())>>;
+            return _has_value ? G(std::in_place, value()) : std::invoke(std::forward<F>(f), error());
+        }
+
+        template <class F>
+        requires(std::is_copy_constructible_v<T>)
+        constexpr auto or_else(F&& f) const &
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(error())>>;
+            return _has_value ? G(std::in_place, value()) : std::invoke(std::forward<F>(f), error());
+        }
+
+        template <class F>
+        requires(std::is_move_constructible_v<T>)
+        constexpr auto or_else(F&& f) &&
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(std::move(error()))>>;
+            return _has_value ? G(std::in_place, std::move(value())) : std::invoke(std::forward<F>(f), std::move(error()));
+        }
+
+        template <class F>
+        requires(std::is_move_constructible_v<T>)
+        constexpr auto or_else(F&& f) const &&
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(std::move(error()))>>;
+            return _has_value ? G(std::in_place, std::move(value())) : std::invoke(std::forward<F>(f), std::move(error()));
+        }
+
+        template <class F>
+        requires(std::is_copy_constructible_v<E>)
+        constexpr auto transform(F&& f) &
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F, decltype(value())>>;
+
+            if (!_has_value)
+                return expected<U,E>(unexpect, error());
+
+            if constexpr (!std::is_void_v<U>)
+                return expected<U,E>(std::invoke(std::forward<F>(f), value()));
+            else
+            {
+                std::invoke(std::forward<F>(f), value());
+                return expected<U,E>();
+            }
+        }
+
+        template <class F>
+        requires(std::is_copy_constructible_v<E>)
+        constexpr auto transform(F&& f) const &
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F, decltype(value())>>;
+
+            if (!_has_value)
+                return expected<U,E>(unexpect, error());
+
+            if constexpr (!std::is_void_v<U>)
+                return expected<U,E>(std::invoke(std::forward<F>(f), value()));
+            else
+            {
+                std::invoke(std::forward<F>(f), value());
+                return expected<U,E>();
+            }
+        }
+
+        template <class F>
+        requires(std::is_move_constructible_v<E>)
+        constexpr auto transform(F&& f) &&
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F, decltype(std::move(value()))>>;
+
+            if (!_has_value)
+                return expected<U,E>(unexpect, std::move(error()));
+
+            if constexpr (!std::is_void_v<U>)
+                return expected<U,E>(std::invoke(std::forward<F>(f), std::move(value())));
+            else
+            {
+                std::invoke(std::forward<F>(f), std::move(value()));
+                return expected<U,E>();
+            }
+        }
+
+        template <class F>
+        requires(std::is_move_constructible_v<E>)
+        constexpr auto transform(F&& f) const &&
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F, decltype(std::move(value()))>>;
+
+            if (!_has_value)
+                return expected<U,E>(unexpect, std::move(error()));
+
+            if constexpr (!std::is_void_v<U>)
+                return expected<U,E>(std::invoke(std::forward<F>(f), std::move(value())));
+            else
+            {
+                std::invoke(std::forward<F>(f), std::move(value()));
+                return expected<U,E>();
+            }
+        }
+
+        template <class F>
+        requires(std::is_copy_constructible_v<T>)
+        constexpr auto transform_error(F&& f) &
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(error())>>;
+            return _has_value ? expected<T,G>() : expected<T,G>(unexpect, std::invoke(std::forward<F>(f), error()));
+        }
+
+        template <class F>
+        requires(std::is_copy_constructible_v<T>)
+        constexpr auto transform_error(F&& f) const &
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(error())>>;
+            return _has_value ? expected<T,G>() : expected<T,G>(unexpect, std::invoke(std::forward<F>(f), error()));
+        }
+
+        template <class F>
+        requires(std::is_move_constructible_v<T>)
+        constexpr auto transform_error(F&& f) &&
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(std::move(error()))>>;
+            return _has_value ? expected<T,G>() : expected<T,G>(unexpect, std::invoke(std::forward<F>(f), std::move(error())));
+        }
+
+        template <class F>
+        requires(std::is_move_constructible_v<T>)
+        constexpr auto transform_error(F&& f) const &&
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(std::move(error()))>>;
+            return _has_value ? expected<T,G>() : expected<T,G>(unexpect, std::invoke(std::forward<F>(f), std::move(error())));
         }
 
         // Equality operators
-
         template <class T2, class E2>
         requires(!std::is_void_v<T2>)
         friend constexpr bool operator==(const expected& x, const expected<T2, E2>& y) {
@@ -897,6 +1075,178 @@ namespace kz {
         constexpr E&        error() &       { return _error; }
         constexpr const E&& error() const&& { return std::move(_error); }
         constexpr E&&       error() &&      { return std::move(_error); }
+
+        template<class G = E>
+        constexpr E error_or(G&& e) const &
+        {
+            return _has_value ? std::forward<G>(e) :  _error;
+        }
+
+        template<class G = E>
+        constexpr E error_or(G&& e) &&
+        {
+            return _has_value ? std::forward<G>(e) :  std::move(_error);
+        }
+
+        template <class F>
+        requires(std::is_copy_constructible_v<E>)
+        constexpr auto and_then(F&& f) &
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F>>;
+            return _has_value ? std::invoke(std::forward<F>(f)) : U(unexpect, error());
+        }
+
+        template <class F>
+        requires(std::is_copy_constructible_v<E>)
+        constexpr auto and_then(F&& f) const &
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F>>;
+            return _has_value ? std::invoke(std::forward<F>(f)) : U(unexpect, error());
+        }
+
+        template <class F>
+        requires(std::is_move_constructible_v<E>)
+        constexpr auto and_then(F&& f)  &&
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F>>;
+            return _has_value ? std::invoke(std::forward<F>(f)) : U(unexpect, std::move(error()));
+        }
+
+        template <class F>
+        requires(std::is_move_constructible_v<E>)
+        constexpr auto and_then(F&& f) const &&
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F>>;
+            return _has_value ? std::invoke(std::forward<F>(f)) : U(unexpect, std::move(error()));
+        }
+
+        template <class F>
+        constexpr auto or_else(F&& f) &
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(error())>>;
+            return _has_value ? G(std::in_place, value()) : std::invoke(std::forward<F>(f), error());
+        }
+
+        template <class F>
+        constexpr auto or_else(F&& f) const &
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(error())>>;
+            return _has_value ? G(std::in_place, value()) : std::invoke(std::forward<F>(f), error());
+        }
+
+        template <class F>
+        constexpr auto or_else(F&& f) &&
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(std::move(error()))>>;
+            return _has_value ? G(std::in_place, std::move(value())) : std::invoke(std::forward<F>(f), std::move(error()));
+        }
+
+        template <class F>
+        constexpr auto or_else(F&& f) const &&
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(std::move(error()))>>;
+            return _has_value ? G(std::in_place, std::move(value())) : std::invoke(std::forward<F>(f), std::move(error()));
+        }
+
+        template <class F>
+        requires(std::is_copy_constructible_v<E>)
+        constexpr auto transform(F&& f) &
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F>>;
+
+            if (!_has_value)
+                return expected<U,E>(unexpect, error());
+
+            if constexpr (!std::is_void_v<U>)
+                return expected<U,E>(std::invoke(std::forward<F>(f)));
+            else
+            {
+                std::invoke(std::forward<F>(f));
+                return expected<U,E>();
+            }
+        }
+
+        template <class F>
+        requires(std::is_copy_constructible_v<E>)
+        constexpr auto transform(F&& f) const &
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F>>;
+
+            if (!_has_value)
+                return expected<U,E>(unexpect, error());
+
+            if constexpr (!std::is_void_v<U>)
+                return expected<U,E>(std::invoke(std::forward<F>(f)));
+            else
+            {
+                std::invoke(std::forward<F>(f));
+                return expected<U,E>();
+            }
+        }
+
+        template <class F>
+        requires(std::is_move_constructible_v<E>)
+        constexpr auto transform(F&& f) &&
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F>>;
+
+            if (!_has_value)
+                return expected<U,E>(unexpect, std::move(error()));
+
+            if constexpr (!std::is_void_v<U>)
+                return expected<U,E>(std::invoke(std::forward<F>(f)));
+            else
+            {
+                std::invoke(std::forward<F>(f));
+                return expected<U,E>();
+            }
+        }
+
+        template <class F>
+        requires(std::is_move_constructible_v<E>)
+        constexpr auto transform(F&& f) const &&
+        {
+            using U = std::remove_cvref_t<std::invoke_result_t<F>>;
+
+            if (!_has_value)
+                return expected<U,E>(unexpect, std::move(error()));
+
+            if constexpr (!std::is_void_v<U>)
+                return expected<U,E>(std::invoke(std::forward<F>(f)));
+            else
+            {
+                std::invoke(std::forward<F>(f));
+                return expected<U,E>();
+            }
+        }
+
+        template <class F>
+        constexpr auto transform_error(F&& f) &
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(error())>>;
+            return _has_value ? expected<T,G>() : expected<T,G>(unexpect, std::invoke(std::forward<F>(f), error()));
+        }
+
+        template <class F>
+        constexpr auto transform_error(F&& f) const &
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(error())>>;
+            return _has_value ? expected<T,G>() : expected<T,G>(unexpect, std::invoke(std::forward<F>(f), error()));
+        }
+
+        template <class F>
+        constexpr auto transform_error(F&& f) &&
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(std::move(error()))>>;
+            return _has_value ? expected<T,G>() : expected<T,G>(unexpect, std::invoke(std::forward<F>(f), std::move(error())));
+        }
+
+        template <class F>
+        constexpr auto transform_error(F&& f) const &&
+        {
+            using G = std::remove_cvref_t<std::invoke_result_t<F, decltype(std::move(error()))>>;
+            return _has_value ? expected<T,G>() : expected<T,G>(unexpect, std::invoke(std::forward<F>(f), std::move(error())));
+        }
 
         // Equality operators
         template <class T2, class E2>
